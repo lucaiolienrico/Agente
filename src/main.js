@@ -1,4 +1,5 @@
 import "./style.css";
+import { resolveCampaign, campaignPanel } from "./campaign.js";
 import { departments, initialLeads, filterLeads, reportLines } from "./data.js";
 import {
   createManager,
@@ -64,18 +65,16 @@ try {
 } catch {}
 if (!saved || typeof saved !== "object") saved = {};
 const state = {
-  page: window.location.hash === "#gestione-agenti" ? "Gestione agenti" : "Panoramica",
+  page:
+    window.location.hash === "#gestione-agenti"
+      ? "Gestione agenti"
+      : "Panoramica",
   manager: createManager(saved.manager),
   running: saved.running ?? true,
   leads: Array.isArray(saved.leads)
     ? saved.leads
     : structuredClone(initialLeads),
-  campaign: saved.campaign || {
-    name: "Nuovi clienti · Italia",
-    sector: "Servizi B2B",
-    city: "Italia",
-    limit: 40,
-  },
+  campaign: resolveCampaign(saved.campaign),
   query: "",
   filter: "Tutti",
   period: "Questa settimana",
@@ -124,7 +123,7 @@ function pageContent() {
   return settingsPage();
 }
 function overview() {
-  return `<div class="page-heading"><div><div class="eyebrow">MENO OPERATIVITÀ, PIÙ OPPORTUNITÀ</div><h1>Il tuo prossimo cliente è già più vicino<span class="title-dot">.</span></h1><p>Il team lavora. Le relazioni crescono. Tu concentrati sulla chiamata.</p></div><button class="button primary" data-action="campaign">${icon("plus")}Nuova campagna</button></div><div class="overview-toolbar"><div class="live-label"><span class="pulse-dot ${state.running ? "" : "off"}"></span><strong>${state.running ? `${agentMetrics(state.manager, state.running).enabled} agenti abilitati` : "67 agenti in pausa"}</strong><span class="dot-separator">·</span><span>8 reparti, un solo obiettivo</span></div><button class="button period-button" data-action="period">${icon("calendar")}${state.period}${icon("down")}</button></div>${stats()}${orchestrator()}<section class="departments-section"><div class="section-heading"><div><h2>La tua squadra, in azione <span class="count-pill">8 reparti</span></h2><p>Un ciclo di sette giorni. Un motore che non smette di migliorare.</p></div><button class="text-button" data-page="Reparti & agenti">Esplora i 67 agenti ${icon("arrow")}</button></div>${departmentGrid()}</section><div class="bottom-grid">${leadSection(false)}${activityPanel()}</div><section class="bottom-banner"><span class="banner-icon">${icon("calendar")}</span><div><h3>Il lavoro preparatorio è nostro. La conversazione è tua.</h3><p>Hai 3 chiamate in programma questa settimana. Il tuo prossimo incontro è domani alle 10:30.</p></div><button class="text-button" data-page="Agenda">Apri l’agenda ${icon("arrow")}</button></section>`;
+  return `<div class="page-heading"><div><div class="eyebrow">MENO OPERATIVITÀ, PIÙ OPPORTUNITÀ</div><h1>Il tuo prossimo cliente è già più vicino<span class="title-dot">.</span></h1><p>Il team lavora. Le relazioni crescono. Tu concentrati sulla chiamata.</p></div><button class="button primary" data-action="campaign">${icon("plus")}Nuova campagna</button></div>${campaignPanel(state.campaign, icon, esc)}<div class="overview-toolbar"><div class="live-label"><span class="pulse-dot ${state.running ? "" : "off"}"></span><strong>${state.running ? `${agentMetrics(state.manager, state.running).enabled} agenti abilitati` : "67 agenti in pausa"}</strong><span class="dot-separator">·</span><span>8 reparti, un solo obiettivo</span></div><button class="button period-button" data-action="period">${icon("calendar")}${state.period}${icon("down")}</button></div>${stats()}${orchestrator()}<section class="departments-section"><div class="section-heading"><div><h2>La tua squadra, in azione <span class="count-pill">8 reparti</span></h2><p>Un ciclo di sette giorni. Un motore che non smette di migliorare.</p></div><button class="text-button" data-page="Reparti & agenti">Esplora i 67 agenti ${icon("arrow")}</button></div>${departmentGrid()}</section><div class="bottom-grid">${leadSection(false)}${activityPanel()}</div><section class="bottom-banner"><span class="banner-icon">${icon("calendar")}</span><div><h3>Il lavoro preparatorio è nostro. La conversazione è tua.</h3><p>Hai 3 chiamate in programma questa settimana. Il tuo prossimo incontro è domani alle 10:30.</p></div><button class="text-button" data-page="Agenda">Apri l’agenda ${icon("arrow")}</button></section>`;
 }
 function stats() {
   const prev = state.period === "Settimana scorsa";
@@ -183,7 +182,7 @@ const badgeClass = (status) =>
     "Da qualificare": "stone",
   })[status] || "stone";
 function leadSection(full) {
-  return `<section class="panel leads-panel"><div class="panel-heading"><div><h2>${full ? "La tua pipeline" : "Le prossime opportunità"} ${full ? `<span class="count-pill">${state.leads.length}</span>` : ""}</h2><p>${full ? "Contatti dimostrativi selezionati dal tuo team." : "Aziende giuste. Persone giuste. Al momento giusto."}</p></div>${full ? "" : `<button class="text-button" data-page="Clienti potenziali">Vedi tutte ${icon("arrow")}</button>`}</div>${full ? `<div class="table-toolbar"><label class="search-field">${icon("search")}<input id="lead-search" placeholder="Cerca azienda, persona o città…" value="${esc(state.query)}" aria-label="Cerca contatti"></label><label class="filter-select">${icon("filter")}<select id="lead-filter" aria-label="Filtra per stato">${["Tutti", "Appuntamento", "In conversazione", "Qualificato", "Messaggio pronto", "Da qualificare"].map((s) => `<option ${state.filter === s ? "selected" : ""}>${s}</option>`).join("")}</select></label></div>` : ""}<div class="table-scroll"><table><thead><tr><th>Azienda</th><th>Compatibilità</th><th>Stato</th><th><span class="sr-only">Dettagli</span></th></tr></thead><tbody id="lead-rows">${leadRows(full)}</tbody></table></div><div class="table-footer"><span>${icon("shield")} Ogni contatto passa dal reparto Qualifica.</span><span>${full ? "Dati di esempio" : "Aggiornato adesso"}</span></div></section>`;
+  return `<section class="panel leads-panel"><div class="panel-heading"><div><h2>${full ? "La tua pipeline" : "Le prossime opportunità"} ${full ? `<span class="count-pill">${state.leads.length}</span>` : ""}</h2><p>${full ? "Contatti dimostrativi selezionati dal tuo team." : "Aziende giuste. Persone giuste. Al momento giusto."}</p></div>${full ? "" : `<button class="text-button" data-page="Clienti potenziali">Vedi tutte ${icon("arrow")}</button>`}</div>${full ? `<div class="table-toolbar"><label class="search-field">${icon("search")}<input id="lead-search" placeholder="Cerca azienda, persona o città…" value="${esc(state.query)}" aria-label="Cerca contatti"></label><label class="filter-select">${icon("filter")}<select id="lead-filter" aria-label="Filtra per stato">${["Tutti", "Appuntamento", "In conversazione", "Qualificato", "Messaggio pronto", "Da qualificare"].map((s) => `<option ${state.filter === s ? "selected" : ""}>${s}</option>`).join("")}</select></label></div>` : ""}<div class="sample-notice">Campione didattico generico: questi contatti non sono risultati della campagna attuale.</div><div class="table-scroll"><table><thead><tr><th>Azienda</th><th>Compatibilità</th><th>Stato</th><th><span class="sr-only">Dettagli</span></th></tr></thead><tbody id="lead-rows">${leadRows(full)}</tbody></table></div><div class="table-footer"><span>${icon("shield")} Ogni contatto passa dal reparto Qualifica.</span><span>${full ? "Dati di esempio" : "Aggiornato adesso"}</span></div></section>`;
 }
 function leadRows(full = true) {
   const rows = full
@@ -281,7 +280,7 @@ function reportPage() {
     )}</ol></section><section class="panel insight-panel"><span class="department-icon yellow">${icon("sparkles")}</span><h2>La prossima settimana<br>parte già più precisa.</h2><p>Il reparto Apprendimento confronta segnali e risultati per migliorare il ciclo successivo.</p><div class="insight"><small>01 / SETTORI</small><h3>Il design risponde meglio</h3><p>Nel campione demo, architettura e design mostrano la compatibilità più alta.</p></div><div class="insight"><small>02 / MESSAGGI</small><h3>Meno parole, più conversazioni</h3><p>Ipotesi da validare con dati reali: testare messaggi brevi e una sola domanda.</p></div><span class="status-badge stone">Insight illustrativi, non risultati reali</span></section></div>`;
 }
 function settingsPage() {
-  return `<div class="page-heading"><div><div class="eyebrow">LE REGOLE LE DECIDI TU</div><h1>Il tuo team, a modo tuo.</h1><p>Definisci il cliente ideale e i confini entro cui lavorare.</p></div></div><div class="settings-grid"><section class="panel settings-panel"><h2>Campagna attuale</h2><p>Queste preferenze vengono salvate solo in questo browser.</p><form id="settings-form">${campaignFields()}<div class="form-note">${icon("shield")}Follow-up: minimo 3 giorni. Nutrimento: ogni 14 giorni. Un solo contatto al giorno per destinatario.</div><button class="button primary" type="submit">${icon("check")}Salva preferenze</button></form></section><section class="panel settings-panel"><h2>Connessioni</h2><p>La modalità demo non effettua connessioni esterne.</p>${[
+  return `<div class="page-heading"><div><div class="eyebrow">LE REGOLE LE DECIDI TU</div><h1>Il tuo team, a modo tuo.</h1><p>Definisci il cliente ideale e i confini entro cui lavorare.</p></div></div>${campaignPanel(state.campaign, icon, esc)}<div class="settings-grid"><section class="panel settings-panel"><h2>Campagna attuale</h2><p>Queste preferenze vengono salvate solo in questo browser.</p><form id="settings-form">${campaignFields()}<div class="form-note">${icon("shield")}Follow-up: minimo 3 giorni. Nutrimento: ogni 14 giorni. Un solo contatto al giorno per destinatario.</div><button class="button primary" type="submit">${icon("check")}Salva preferenze</button></form></section><section class="panel settings-panel"><h2>Connessioni</h2><p>La modalità demo non effettua connessioni esterne.</p>${[
     ["mail", "Email aziendale", "Invio, risposte e controllo disiscrizioni"],
     [
       "calendar",
@@ -299,7 +298,7 @@ function settingsPage() {
     )}<div class="notice">${icon("shield")}Prima dell’invio reale servono verifica della base giuridica, gestione opt-out, revisione umana e credenziali lato server.</div></section></div>`;
 }
 function campaignFields(newCampaign = false) {
-  return `<label class="form-label">Nome campagna<input name="name" required maxlength="90" value="${newCampaign ? "" : esc(state.campaign.name)}" placeholder="Es. Nuovi clienti · Lombardia"></label><div class="form-row"><label class="form-label">Settore ideale<input name="sector" required maxlength="80" value="${esc(state.campaign.sector)}" placeholder="Servizi B2B"></label><label class="form-label">Area geografica<input name="city" required maxlength="80" value="${esc(state.campaign.city)}" placeholder="Italia"></label></div><label class="form-label">Limite giornaliero di invio<input name="limit" type="number" min="1" max="200" required value="${Number(state.campaign.limit)}"><small>Da 1 a 200 messaggi. In demo non viene inviata alcuna email.</small></label>`;
+  return `<label class="form-label">Nome campagna<input name="name" required maxlength="90" value="${newCampaign ? "" : esc(state.campaign.name)}" placeholder="Es. Nuovi clienti · Lombardia"></label><div class="form-row"><label class="form-label">Settore ideale<input name="sector" required maxlength="80" value="${esc(state.campaign.sector)}" placeholder="Veterinari, pet shop e negozi di animali"></label><label class="form-label">Area geografica<input name="city" required maxlength="80" value="${esc(state.campaign.city)}" placeholder="Italia"></label></div><label class="form-label">Prodotto o servizio offerto<textarea name="offer" maxlength="600" rows="3" placeholder="Che cosa proponi a veterinari e negozi di animali?">${esc(state.campaign.offer || "")}</textarea><small>Facoltativo per configurare il target; necessario per preparare una bozza commerciale pertinente.</small></label><label class="form-label">Limite giornaliero di invio<input name="limit" type="number" min="1" max="200" required value="${Number(state.campaign.limit)}"><small>Da 1 a 200 messaggi. In demo non viene inviata alcuna email.</small></label>`;
 }
 function bind() {
   document.querySelectorAll("[data-page]").forEach(
@@ -355,7 +354,7 @@ function updateRows() {
 }
 function saveCampaign(form) {
   const data = Object.fromEntries(new FormData(form));
-  state.campaign = { ...data, limit: Number(data.limit) };
+  state.campaign = resolveCampaign(data);
   persist();
 }
 let toastTimeout;
@@ -423,7 +422,7 @@ function leadModal(id) {
   if (!l) return;
   modal(
     esc(l.company),
-    `<div class="contact-profile"><span class="company-logo large-logo ${l.color}">${esc(l.initials)}</span><div><h3>${esc(l.name)}</h3><p>${esc(l.role)} · ${esc(l.city)}</p><small>${esc(l.email)}</small></div><div class="score">${icon("sparkles")}${l.score}%</div></div><div class="lead-context"><h3>Perché è un buon contatto</h3><p>Azienda nel settore ${esc(l.sector.toLowerCase())}, con un decisore identificato. La compatibilità e i segnali riportati sono esempi dimostrativi.</p></div><label class="form-label">Stato nella pipeline<select id="contact-status">${["Da qualificare", "Qualificato", "Messaggio pronto", "In conversazione", "Appuntamento"].map((s) => `<option ${s === l.status ? "selected" : ""}>${s}</option>`).join("")}</select></label><div class="message-preview"><small>BOZZA PERSONALIZZATA · NON INVIATA</small><p>Ciao ${esc(l.name.split(" ")[0])}, ho scoperto ${esc(l.company)} e il vostro lavoro nel settore ${esc(l.sector.toLowerCase())}. Aiutiamo le aziende a dedicare meno tempo alla ricerca commerciale e più tempo alle relazioni. È una priorità anche per voi in questo periodo?</p></div><div class="modal-actions"><button class="button" id="copy-message">${icon("message")}Copia bozza</button><button class="button primary" id="save-lead">${icon("check")}Salva stato</button></div>`,
+    `<div class="contact-profile"><span class="company-logo large-logo ${l.color}">${esc(l.initials)}</span><div><h3>${esc(l.name)}</h3><p>${esc(l.role)} · ${esc(l.city)}</p><small>${esc(l.email)}</small></div><div class="score">${icon("sparkles")}${l.score}%</div></div><div class="lead-context"><h3>Perché è un buon contatto</h3><p>Azienda nel settore ${esc(l.sector.toLowerCase())}, con un decisore identificato. La compatibilità e i segnali riportati sono esempi dimostrativi.</p></div><label class="form-label">Stato nella pipeline<select id="contact-status">${["Da qualificare", "Qualificato", "Messaggio pronto", "In conversazione", "Appuntamento"].map((s) => `<option ${s === l.status ? "selected" : ""}>${s}</option>`).join("")}</select></label><div class="message-preview"><small>BOZZA PERSONALIZZATA · NON INVIATA</small><p>${state.campaign.offer ? `Ciao ${esc(l.name.split(" ")[0])}, ti contatto per presentarti questa proposta: ${esc(state.campaign.offer)}. Può essere pertinente per ${esc(l.company)}?` : "Prima di preparare una bozza, indica nelle Impostazioni quale prodotto o servizio offri. Non conosciamo ancora la tua proposta commerciale."}</p></div><div class="modal-actions"><button class="button" id="copy-message" ${state.campaign.offer ? "" : "disabled"}>${icon("message")}Copia bozza</button><button class="button primary" id="save-lead">${icon("check")}Salva stato</button></div>`,
     `${esc(l.sector)} · Contatto dimostrativo`,
   );
   document.querySelector("#save-lead").onclick = () => {

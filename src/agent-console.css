@@ -820,3 +820,116 @@
   color: #8b9a7e;
   margin-top: 5px;
 }
+
+.target-profile {
+  background: #f0f5e9;
+  border: 1px solid #dce6d3;
+  border-radius: 9px;
+  padding: 19px 21px;
+  margin: 0 0 24px;
+}
+.target-profile-top {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+.target-profile .eyebrow {
+  font-size: 8px;
+  margin-bottom: 6px;
+}
+.target-profile h2 {
+  font-size: 16px;
+  letter-spacing: -0.3px;
+  line-height: 1.5;
+}
+.target-profile-top p {
+  font-size: 11px;
+  color: #6f8363;
+  margin-top: 5px;
+}
+.target-profile-top > .button {
+  margin-left: auto;
+  font-size: 10px;
+}
+.target-profile details {
+  margin-top: 14px;
+  border-top: 1px solid #dfe7d6;
+  padding-top: 12px;
+}
+.target-profile summary {
+  cursor: pointer;
+  font-size: 11px;
+  color: #69815b;
+  line-height: 1.8;
+}
+.target-profile-details {
+  padding: 8px 0 0 16px;
+}
+.target-profile-details p {
+  font-size: 11px;
+  color: #687e59;
+  line-height: 1.9;
+  margin: 6px 0;
+}
+.agent-target-context {
+  background: #f2f6ec;
+  border-radius: 7px;
+  padding: 14px;
+  margin-bottom: 20px;
+}
+.agent-target-context strong {
+  font-size: 11px;
+  color: #627d51;
+}
+.agent-target-context p {
+  font-size: 10px;
+  color: #7b8d6e;
+  line-height: 1.8;
+  white-space: pre-line;
+  margin-top: 7px;
+}
+.sample-notice {
+  font-size: 9px;
+  line-height: 1.7;
+  color: #8a7c60;
+  background: #faf7f0;
+  padding: 10px 19px;
+  border-top: 1px solid #f0ece2;
+}
+@media (max-width: 720px) {
+  .target-profile {
+    padding: 16px 14px;
+    margin-bottom: 20px;
+  }
+  .target-profile-top {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .target-profile h2 {
+    font-size: 14px;
+  }
+  .target-profile-top > div {
+    flex: 1;
+    min-width: 180px;
+  }
+  .target-profile-top > .button {
+    margin: 3px 0 0 43px;
+    font-size: 9px;
+  }
+  .target-profile-top p {
+    font-size: 10px;
+  }
+  .target-profile-details {
+    padding-left: 0;
+  }
+  .target-profile-details p {
+    font-size: 10px;
+  }
+  .target-profile summary {
+    font-size: 10px;
+  }
+  .sample-notice {
+    font-size: 8px;
+    padding: 10px 13px;
+  }
+}

@@ -1,4 +1,5 @@
 import { departments } from "./data.js";
+import { campaignContext } from "./campaign.js";
 
 // Catalogo stabile: identità e responsabilità non dipendono dai dati salvati.
 export const roles = [
@@ -127,7 +128,7 @@ export function createManager(raw = {}) {
           "Lavora solo sul campione demo. Segnala informazioni mancanti e non inventare dati o risultati. Non effettuare azioni esterne.",
         ),
         taskState: taskStates.includes(a.taskState) ? a.taskState : "In coda",
-        output: typeof a.output === "string" ? a.output.slice(0, 3000) : "",
+        output: typeof a.output === "string" ? a.output.slice(0, 6000) : "",
         completed: integer(a.completed),
         runs: integer(a.runs),
         lastRun:
@@ -239,6 +240,7 @@ export function runAgents(
   manager,
   running,
   ids = manager.agents.map((a) => a.id),
+  campaign,
 ) {
   if (!running)
     return { processed: 0, review: 0, reason: "La pausa globale è attiva." };
@@ -257,7 +259,7 @@ export function runAgents(
     a.taskState = a.reviewRequired ? "Da approvare" : "Completato";
     if (a.reviewRequired) review++;
     else a.completed++;
-    a.output = `ESITO SIMULATO · ${a.id}\nIncarico: ${a.task}\nIstruzioni registrate: ${a.instructions}\nVerifica locale: incarico presente e agente abilitato.\n${a.reviewRequired ? "Contenuto o azione sensibile: richiesta revisione umana. Nessuna comunicazione o prenotazione eseguita." : "Passaggio di workflow completato nel simulatore. Nessuna ricerca, analisi IA o azione esterna eseguita."}\nQuesto testo è un riepilogo deterministico, non un risultato prodotto da un modello IA.`;
+    a.output = `ESITO SIMULATO · ${a.id}\n${campaign ? campaignContext(campaign) + "\n" : ""}Incarico: ${a.task}\nIstruzioni registrate: ${a.instructions}\nVerifica locale: incarico presente e agente abilitato.\n${a.reviewRequired ? "Contenuto o azione sensibile: richiesta revisione umana. Nessuna comunicazione o prenotazione eseguita." : "Passaggio di workflow completato nel simulatore. Nessuna ricerca, analisi IA o azione esterna eseguita."}\nQuesto testo è un riepilogo deterministico, non un risultato prodotto da un modello IA.`;
     logEvent(
       manager,
       a.id,
@@ -311,6 +313,8 @@ La dashboard gestisce ${m.total} schede agente in 8 reparti. È un simulatore lo
 
 - Campagna configurata: ${md(campaign.name)}.
 - Settore: ${md(campaign.sector)}. Area: ${md(campaign.city)}.
+- Offerta commerciale: ${campaign.offer ? md(campaign.offer) : "da definire; nessun prodotto o vantaggio presunto"}.
+- Profilo registrato: ${md(campaignContext(campaign))}
 - Interruttore globale: ${running ? "simulazione abilitata" : "pausa attiva"}.
 - Agenti effettivamente abilitati: ${m.enabled}; sospesi: ${m.paused}.
 - Incarichi in coda: ${m.queued}, di cui eseguibili: ${m.ready}.

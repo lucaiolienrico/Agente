@@ -75,9 +75,9 @@ Le regole di follow-up dopo almeno tre giorni, un solo contatto giornaliero per 
 ## Test
 
 ```bash
-npm test                       # 17 test unitari
+npm test                       # 22 test unitari
 npx playwright install chromium
-npm run test:e2e                # 15 test browser, inclusa navigazione mobile
+npm run test:e2e                # 18 test browser, inclusa navigazione mobile
 ```
 
 Playwright riutilizza un server Vite attivo sulla porta 5173 oppure ne avvia uno per i test. È possibile impostare `CHROMIUM_PATH` per usare un browser già installato.
@@ -118,4 +118,12 @@ Configurazione corrente: ramo **arena/01a0aba2-agente**, cartella **/ (root)**. 
 
 `docs/index.html`, `docs/assets/` e i file `.nojekyll` sono intenzionalmente versionati. Il report viene preservato durante la build. Dopo ogni modifica a `src/`, rigenerare e caricare anche la build statica. Non è necessario modificare `main` o creare altri rami.
 
-Istruzioni e configurazioni alternative: [Pubblicazione](docs/PUBBLICAZIONE.md). `npm run test:pages` esegue tre test aggiuntivi sul pacchetto pubblicabile, inclusa la navigazione dalla radice del repository. Questi si aggiungono ai 17 test unitari e 15 test browser dell'app. È supportata la variabile `CHROMIUM_PATH` per un browser già installato.
+Istruzioni e configurazioni alternative: [Pubblicazione](docs/PUBBLICAZIONE.md). `npm run test:pages` esegue tre test aggiuntivi sul pacchetto pubblicabile, inclusa la navigazione dalla radice del repository. Questi si aggiungono ai 22 test unitari e 18 test browser dell'app. È supportata la variabile `CHROMIUM_PATH` per un browser già installato.
+
+## Target commerciale attuale
+
+Il profilo predefinito è **Veterinari, pet shop e negozi di animali — tutta Italia**. Pet shop e negozio di animali sono categorie sovrapposte, da deduplicare in una futura ricerca reale. L'offerta dell'azienda è ancora da definire e può essere inserita nelle Impostazioni.
+
+Il contesto è mostrato nelle schede agente e incluso nei nuovi esiti demo e nei report. Il vecchio profilo B2B predefinito viene migrato senza cancellare contatti, pause o incarichi. Le campagne personalizzate sono preservate. La pipeline rimane un campione generico, non una lista di veterinari trovati.
+
+Specifiche e limiti: [Profilo clienti](docs/PROFILO_CLIENTI.md). Logica condivisa in `src/campaign.js`. Senza offerta configurata, la bozza commerciale non viene inventata. Le ricerche reali e gli invii restano disabilitati: nessun connettore è stato attivato.

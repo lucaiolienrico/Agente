@@ -2,6 +2,8 @@
 
 **Data di consegna: 16 settembre 2026**
 
+**Aggiornamento successivo:** il target predefinito è ora veterinari, pet shop e negozi di animali in tutta Italia. Vedi [Profilo clienti](PROFILO_CLIENTI.md). I numeri e la campagna generica di questo documento restano la baseline storica iniziale; il report esportato dalla console riflette invece lo stato corrente.
+
 **Ambito:** nuova console Gestione agenti, report operativo e test di regressione.
 
 > Questo documento fotografa la configurazione iniziale del progetto, non legge lo stato del browser dell’utente. Per un report aggiornato alle proprie azioni, aprire Gestione agenti → Report operativo → Scarica report .md. Nessun numero qui riportato rappresenta un risultato di vendita reale.
