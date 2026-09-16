@@ -7,7 +7,10 @@ export default defineConfig({
       transformIndexHtml: {
         order: "pre",
         handler: (html) =>
-          html.replace(/\s*<meta name="pages-root-redirect"[^>]*>/, ""),
+          html.replace(
+            /\s*<meta\b(?=[^>]*\bname="pages-root-redirect")[^>]*>/g,
+            "",
+          ),
       },
     },
   ],
