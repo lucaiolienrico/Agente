@@ -48,3 +48,55 @@ test("Pages direct console link works on mobile and the authored report is serve
   expect(report.ok()).toBe(true);
   expect(await report.text()).toContain("Report dettagliato di consegna");
 });
+
+test("Pages repository root redirects to the compiled console with working relative assets", async ({
+  page,
+}) => {
+  const { createServer } = await import("node:http");
+  const { readFile } = await import("node:fs/promises");
+  const { resolve, extname } = await import("node:path");
+  const root = resolve("docs");
+  const failures = [];
+  page.on("pageerror", (error) => failures.push(error.message));
+  const server = createServer(async (req, res) => {
+    const pathname = new URL(req.url, "http://localhost").pathname;
+    let file;
+    if (pathname === "/Agente/") file = resolve("index.html");
+    else if (pathname.startsWith("/Agente/docs/")) {
+      file = resolve(
+        root,
+        pathname.slice("/Agente/docs/".length) || "index.html",
+      );
+      if (!file.startsWith(root + "/")) file = null;
+    }
+    if (!file) {
+      res.writeHead(404).end();
+      return;
+    }
+    try {
+      const body = await readFile(file);
+      const type =
+        { ".html": "text/html", ".js": "text/javascript", ".css": "text/css" }[
+          extname(file)
+        ] || "text/plain";
+      res.writeHead(200, { "Content-Type": type });
+      res.end(body);
+    } catch {
+      res.writeHead(404).end();
+    }
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  try {
+    await page.goto(`http://127.0.0.1:${server.address().port}/Agente/`);
+    await expect(page).toHaveURL(/\/Agente\/docs\/#gestione-agenti$/);
+    await expect(page.locator("#agent-rows tr")).toHaveCount(67);
+    await expect(page.locator("h1")).toContainText("Il controllo è tuo");
+    expect(failures).toEqual([]);
+    expect(await readFile("docs/index.html", "utf8")).not.toContain(
+      'name="pages-root-redirect"',
+    );
+  } finally {
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
+  }
+});

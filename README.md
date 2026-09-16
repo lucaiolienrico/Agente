@@ -112,10 +112,10 @@ Per azzerare la demo, rimuovere la chiave `agente-v1` dal localStorage tramite g
 
 ## Pubblicazione su GitHub Pages
 
-La versione distribuibile per Pages si genera con `npm run build:pages` e viene scritta in `docs/`, con base URL `/Agente/`. `docs/index.html`, `docs/assets/` e `docs/.nojekyll` sono intenzionalmente versionati per la pubblicazione dalla cartella `/docs`; il report esistente viene preservato.
+La build pubblicabile si genera con `npm run build:pages` e viene scritta in `docs/`, con asset relativi. Funziona sia quando Pages pubblica dalla radice del repository, sia quando pubblica direttamente da `/docs`.
 
-Il sito deve utilizzare il ramo **arena/01a0aba2-agente**, senza modificare `main` o creare altri rami. Per attivarlo occorre un amministratore in **Settings → Pages → Deploy from a branch → arena/01a0aba2-agente → /docs**. La connessione Arena ha restituito HTTP 403 per l'attivazione automatica: la presenza della build non certifica che il sito sia online.
+Configurazione corrente: ramo **arena/01a0aba2-agente**, cartella **/ (root)**. La console compilata è quindi nel percorso `/Agente/docs/#gestione-agenti`. La pagina principale reindirizza alla console; Vite rimuove quel reindirizzamento nelle build e durante lo sviluppo, evitando cicli.
 
-Istruzioni complete: [Pubblicazione](docs/PUBBLICAZIONE.md). Dopo ogni modifica al frontend, rigenerare e caricare anche la build statica.
+`docs/index.html`, `docs/assets/` e i file `.nojekyll` sono intenzionalmente versionati. Il report viene preservato durante la build. Dopo ogni modifica a `src/`, rigenerare e caricare anche la build statica. Non è necessario modificare `main` o creare altri rami.
 
-`npm run test:pages` esegue due test aggiuntivi sulla versione pubblicabile (asset con prefisso, link diretto, console, mobile e report), separati dai 17 test unitari e 15 test browser dell'app. Per un Chromium già installato è supportata la variabile `CHROMIUM_PATH`.
+Istruzioni e configurazioni alternative: [Pubblicazione](docs/PUBBLICAZIONE.md). `npm run test:pages` esegue tre test aggiuntivi sul pacchetto pubblicabile, inclusa la navigazione dalla radice del repository. Questi si aggiungono ai 17 test unitari e 15 test browser dell'app. È supportata la variabile `CHROMIUM_PATH` per un browser già installato.

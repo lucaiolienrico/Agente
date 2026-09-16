@@ -2,6 +2,12 @@
 <html lang="it">
   <head>
     <meta charset="UTF-8" />
+    <!-- Static root fallback. Vite removes this tag in dev and production builds. -->
+    <meta
+      name="pages-root-redirect"
+      http-equiv="refresh"
+      content="0; url=./docs/#gestione-agenti"
+    />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#172621" />
     <meta
@@ -15,8 +21,8 @@
       href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;450;500;550;600;650;700&family=Manrope:wght@400;500;600;650;700;750;800&display=swap"
       rel="stylesheet"
     />
-    <script type="module" crossorigin src="/Agente/assets/index-YQRId8sB.js"></script>
-    <link rel="stylesheet" crossorigin href="/Agente/assets/index-B4i-k6jl.css">
+    <script type="module" crossorigin src="./assets/index-YQRId8sB.js"></script>
+    <link rel="stylesheet" crossorigin href="./assets/index-B4i-k6jl.css">
   </head>
   <body>
     <div id="app"></div>

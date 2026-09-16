@@ -5,7 +5,8 @@ import { mkdir, rm, writeFile } from "node:fs/promises";
 await mkdir("docs", { recursive: true });
 await rm("docs/assets", { recursive: true, force: true });
 await build({
-  base: "/Agente/",
+  // Relative assets support either Pages source: /docs or repository root.
+  base: "./",
   build: { outDir: "docs", emptyOutDir: false },
 });
 await writeFile("docs/.nojekyll", "");

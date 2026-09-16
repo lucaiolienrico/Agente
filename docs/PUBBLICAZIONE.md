@@ -2,7 +2,9 @@
 
 ## Stato e requisito
 
-La build statica è disponibile in questa cartella. La configurazione di GitHub Pages deve essere abilitata da un amministratore del repository. Il tentativo dalla connessione Arena ha restituito **HTTP 403 — Resource not accessible by integration**: non equivale a una pubblicazione riuscita.
+GitHub Pages è stato attivato dall’amministratore sul ramo `arena/01a0aba2-agente`, cartella `/ (root)`. La build compilata è disponibile nella sottocartella `docs/`. L’API della connessione Arena non consente di cambiare le impostazioni Pages (HTTP 403), ma consente di caricare gli aggiornamenti del codice.
+
+Con questa configurazione, il collegamento diretto è `https://lucaiolienrico.github.io/Agente/docs/#gestione-agenti`. La pagina principale reindirizza a questo percorso. Verificare sempre l’esito del deployment prima di distribuire un aggiornamento.
 
 Non cambiare la visibilità del repository, il ramo predefinito o il nome di questo ramo. Il repository è già pubblico.
 
@@ -11,16 +13,17 @@ Non cambiare la visibilità del repository, il ramo predefinito o il nome di que
 1. Aprire [Settings → Pages](https://github.com/lucaiolienrico/Agente/settings/pages) con l'account che amministra il repository.
 2. In **Build and deployment → Source**, selezionare **Deploy from a branch**.
 3. Selezionare il ramo **arena/01a0aba2-agente**.
-4. Selezionare la cartella **/docs**, quindi premere **Save**.
+4. Lasciare la cartella **/ (root)** nella configurazione corrente, quindi premere **Save**. In alternativa, `/docs` pubblica la stessa app direttamente sotto `/Agente/`.
 5. Attendere l'esito della pubblicazione nella sezione Pages o nel workflow **pages build and deployment** di GitHub Actions.
-6. Usare **Visit site** da GitHub e aggiungere `#gestione-agenti` all'URL per aprire direttamente la console.
+6. Usare **Visit site** da GitHub: con la radice selezionata, il browser viene reindirizzato a `docs/#gestione-agenti`.
 
 Se il ramo non compare, verificare prima che sia stato caricato su GitHub. Se la sezione Pages non è accessibile, servono i permessi dell'amministratore del repository.
 
-L'indirizzo standard atteso, **solo dopo una pubblicazione riuscita e in assenza di dominio personalizzato**, è:
+Gli indirizzi, **solo dopo una pubblicazione riuscita e in assenza di dominio personalizzato**, sono:
 
 ```text
-https://lucaiolienrico.github.io/Agente/#gestione-agenti
+Sorgente / (root): https://lucaiolienrico.github.io/Agente/docs/#gestione-agenti
+Sorgente /docs:    https://lucaiolienrico.github.io/Agente/#gestione-agenti
 ```
 
 Questo documento non certifica che l'indirizzo sia già attivo. L'URL definitivo e lo stato della pubblicazione vanno verificati in GitHub Pages.
@@ -35,7 +38,7 @@ npm test
 npm run build:pages
 ```
 
-La build usa la base `/Agente/`, scrive `docs/index.html`, rigenera `docs/assets/` e aggiunge `.nojekyll`, preservando i report Markdown. I file statici sono versionati perché Pages pubblica direttamente da `/docs`.
+La build usa percorsi relativi per gli asset (`./`), scrive `docs/index.html`, rigenera `docs/assets/` e aggiunge `.nojekyll`, preservando i report Markdown. I file statici sono versionati perché Pages pubblica direttamente da `/docs`.
 
 Dopo aver verificato le modifiche, aggiungerle a un commit sul ramo della sessione e inviarle esclusivamente con:
 
@@ -52,7 +55,7 @@ npx playwright install chromium
 npm run test:pages
 ```
 
-I due test dedicati verificano il caricamento degli asset sotto `/Agente/`, l'accesso diretto alla console, un ciclo demo, il layout mobile e la disponibilità del report. Questi sono test locali del pacchetto pubblicabile, non una verifica dell'URL pubblico di GitHub.
+I tre test dedicati verificano il caricamento degli asset sotto `/Agente/`, l'accesso diretto alla console, un ciclo demo, il layout mobile la disponibilità del report e il reindirizzamento dalla radice del repository. Questi sono test locali del pacchetto pubblicabile, non una verifica dell'URL pubblico di GitHub.
 
 ## Dati e limiti
 
