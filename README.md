@@ -21,6 +21,16 @@ Un agente dedicato a **[PetNote](https://www.petnote.it/partner)**: ricerca vete
 
 **PayPal e push telefono sono già presenti in PetNote**, come confermato dal titolare; qui non vengono ricostruiti. Un futuro collegamento di eventi richiederà un’integrazione separata e autorizzata. I flussi autenticati, i pagamenti e le notifiche non sono stati verificati end-to-end da questo progetto.
 
+## Usarlo direttamente dalla repo Agente (GitHub Codespaces)
+
+**Non serve un’altra repository o un’installazione sul tuo computer.** Apri [il ramo dell’agente in Agente](https://github.com/lucaiolienrico/Agente/tree/arena/01a0aba2-agente), poi **Code → Codespaces → Create codespace** su quel ramo. Attendi la preparazione, esegui `npm start` nel terminale e apri la porta **3000** nel browser, mantenendola privata.
+
+La configurazione crea una password amministrativa nel file `.env` privato del Codespace; non la stampa nei log e non la pubblica in Git. Non serve un token GitHub. Ricerca e bozze IA richiedono invece la configurazione separata di OpenAI.
+
+**[Guida passo per passo: usare Agente con Codespaces](docs/CODESPACES.md)**.
+
+Codespaces usa le quote del tuo account, può avere costi e non è un hosting sempre acceso. I dati rimangono nel disco del singolo Codespace, non nella repository: fai backup prima di eliminarlo. La configurazione è predisposta, ma non è stato creato un Codespace nel tuo account.
+
 ## Avvio locale
 
 Richiede **Node.js 22.13+** (testato con 22.22.3), npm e spazio scrivibile per SQLite. `node:sqlite` può emettere un avviso sperimentale su Node 22.
