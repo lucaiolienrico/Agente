@@ -12,6 +12,7 @@ function setup(t, provider, cfg = config) {
   const agent = createAgent(store, provider, cfg);
   t.after(async () => {
     agent.pause(true);
+    agent.shutdown();
     await idle(agent);
     store.close();
   });
@@ -166,4 +167,26 @@ test("persistenza e riavvio non ripetono lavori a pagamento", () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("arresto non avvia lavori in coda né callback su database chiuso", async () => {
+  const store = createStore(":memory:");
+  let calls = 0;
+  const agent = createAgent(
+    store,
+    {
+      research: async () => {
+        calls++;
+        return result;
+      },
+    },
+    config,
+  );
+  agent.enqueueResearch(research);
+  agent.shutdown();
+  assert.throws(() => agent.enqueueResearch(research), /arresto/);
+  store.close();
+  await tick();
+  assert.equal(calls, 0);
+  assert.equal(agent.idle(), true);
 });

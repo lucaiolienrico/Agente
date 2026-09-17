@@ -120,10 +120,12 @@ export function createStore(filename) {
         .all()
         .map(json),
     job: (id) => json(db.prepare("SELECT data FROM jobs WHERE id=?").get(id)),
-    addJob(kind, request) {
+    addJob(kind, request, { provider = null, model = null } = {}) {
       const job = {
         id: randomUUID(),
         kind,
+        provider,
+        model,
         status: "queued",
         request,
         createdAt: now(),

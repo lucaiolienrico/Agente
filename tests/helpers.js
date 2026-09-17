@@ -3,6 +3,7 @@ import { createStore } from "../server/store.js";
 import { createAgent } from "../server/agent.js";
 import { createApp } from "../server/app.js";
 export const config = {
+  provider: "openai",
   production: false,
   preview: false,
   origin: "http://localhost:3000",
@@ -136,6 +137,7 @@ export async function fixture(
   }
   t.after(async () => {
     agent.pause(true);
+    agent.shutdown();
     await idle(agent);
     await new Promise((resolve) => {
       server.close(resolve);

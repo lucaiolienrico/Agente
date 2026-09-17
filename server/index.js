@@ -1,3 +1,4 @@
+import { aiStatus } from "./ai-config.js";
 import { resolve } from "node:path";
 import { createStore } from "./store.js";
 import { createProvider } from "./provider.js";
@@ -20,7 +21,7 @@ const server = app.listen(port, "0.0.0.0", () => {
   console.log(
     config.preview
       ? "ANTEPRIMA APERTA: non inserire dati riservati; chiamate IA disabilitate."
-      : `Accesso amministratore ${config.password ? "configurato" : "da configurare"}. Provider ${config.apiKey && config.model ? "configurato (non ancora verificato)" : "non configurato"}.`,
+      : `Accesso amministratore ${config.password ? "configurato" : "da configurare"}. ${aiStatus(config).label} ${config.apiKey && config.model ? "configurato (non ancora verificato)" : "non configurato"}.`,
   );
 });
 function shutdown() {

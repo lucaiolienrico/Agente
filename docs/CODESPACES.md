@@ -35,13 +35,15 @@ Nell’esplora-file del Codespace apri `.env`. Copia **solo il valore** di `ADMI
 
 Ora puoi approvare la **Scheda PetNote**, aggiungere strutture manualmente e gestire l’archivio. Non appariranno risultati IA inventati.
 
-## 4. Abilita l’IA quando vuoi usarla
+## 4. Abilita Groq quando vuoi usarlo
 
-Nel file `.env` del Codespace valorizza `OPENAI_API_KEY` e `OPENAI_MODEL` con una chiave del tuo account OpenAI e un modello compatibile con Responses, web_search e Structured Outputs. In alternativa usa i secrets Codespaces limitati alla repository Agente, seguendo le istruzioni GitHub per applicarli all’ambiente.
+Il provider iniziale è **Groq**. Nel `.env` privato aggiungi `AI_PROVIDER=groq`, la tua `GROQ_API_KEY` e `GROQ_MODEL=openai/gpt-oss-20b`. Quel modello è eseguito da Groq, non da ChatGPT. Lascia `GROQ_SEARCH_ENABLED=false` per cominciare solo dalle bozze; la ricerca web con Compound Mini si abilita separatamente dopo averne verificato quote e costi.
 
-**Un token GitHub non è una chiave OpenAI e non può attivare la ricerca.**
+**[Segui la guida Groq, anche per aggiornare un Codespace già aperto](GROQ.md)**. Lo script iniziale non sovrascrive il tuo `.env`, quindi non sostituisce la password né configura una chiave al posto tuo.
 
-Dopo le modifiche al file, ferma il processo con **Ctrl+C** e riavvia con `npm start`. Le chiamate IA sono a pagamento e partono solo quando le richiedi dall’interfaccia. Inizia con una ricerca da **1 struttura**. Non viene eseguito alcun test a pagamento all’avvio.
+**Un token GitHub non è una chiave Groq e non può attivare l’IA.** Non inviare chiavi in chat o nei commit. Puoi anche usare i secrets Codespaces limitati a questa repository.
+
+Dopo le modifiche, ferma il processo con **Ctrl+C** e riavvia con `npm start`. Le chiamate consumano la quota del tuo account e possono avere costi: partono soltanto quando le richiedi. Nessun test a pagamento all’avvio e nessun passaggio automatico a OpenAI.
 
 Percorso operativo: **Scheda PetNote → Ricerca → Verifica della fonte e qualifica → Bozza → Revisione umana**. L’approvazione/esportazione richiede anche una richiesta pertinente o un consenso documentato e il recapito professionale autorizzato. Il sistema non invia messaggi.
 
@@ -59,6 +61,6 @@ Percorso operativo: **Scheda PetNote → Ricerca → Verifica della fonte e qual
 - **Codice vecchio:** controlla di avere aperto il ramo `arena/01a0aba2-agente`.
 - **Errore 403 “Origine non autorizzata”:** confronta `APP_ORIGIN` in `.env` con l’origine HTTPS mostrata per la porta 3000. Deve essere identica e senza slash finale. Lo script non sovrascrive un `.env` già esistente: una configurazione precedente va aggiornata manualmente e il server riavviato.
 - **Login non funziona:** usa la password amministrativa dell’ambiente, non token o password GitHub. Controlla se un secret Codespaces prevale sul file.
-- **Ricerca disattivata:** controlla le due variabili OpenAI e riavvia. La presenza della configurazione non garantisce compatibilità del modello o quota disponibile.
+- **Ricerca disattivata:** controlla GROQ_API_KEY, GROQ_MODEL e, per la ricerca, GROQ_SEARCH_ENABLED; poi riavvia. La presenza della configurazione non garantisce compatibilità del modello o quota disponibile.
 
-La configurazione e lo script sono coperti da test locali. La creazione di un Codespace nel tuo account e la prima chiamata OpenAI richiedono una tua azione; non sono state eseguite al posto tuo.
+La configurazione e lo script sono coperti da test locali. La creazione di un Codespace nel tuo account e la prima chiamata Groq richiedono una tua azione; non sono state eseguite al posto tuo.

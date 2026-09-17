@@ -1,20 +1,20 @@
+import { aiStatus } from "./ai-config.js";
 import { AppError } from "./domain.js";
 
 export function createAgent(store, provider, config) {
   let busy = false;
+  let stopped = false;
   let controller = null;
   let activeId = null;
   const available = () => {
+    if (stopped) throw new AppError(503, "Agente in arresto.");
     if (config.preview)
       throw new AppError(
         409,
         "Anteprima aperta: le chiamate IA sono disabilitate. Nessuna simulazione di ricerca.",
       );
     if (!config.apiKey || !config.model)
-      throw new AppError(
-        503,
-        "Collega il provider sul server: servono OPENAI_API_KEY e OPENAI_MODEL.",
-      );
+      throw new AppError(503, aiStatus(config).configHint);
     if (store.isPaused()) throw new AppError(409, "L’agente è in pausa.");
     const jobs = store.jobs();
     const pending = jobs.filter((j) =>
@@ -30,7 +30,7 @@ export function createAgent(store, provider, config) {
       );
   };
   async function pump() {
-    if (busy || store.isPaused()) return;
+    if (stopped || busy || store.isPaused()) return;
     const job = store
       .jobs()
       .filter((j) => j.status === "queued")
@@ -66,7 +66,7 @@ export function createAgent(store, provider, config) {
       const callId = store.startCall();
       store.log(
         job.id,
-        "Chiamata al provider avviata. Può comportare costi del provider.",
+        `Chiamata ${aiStatus(config).label} avviata. Può comportare costi del provider.`,
       );
       const result =
         job.kind === "research"
@@ -168,13 +168,18 @@ export function createAgent(store, provider, config) {
       busy = false;
       activeId = null;
       controller = null;
-      setImmediate(pump);
+      if (!stopped) setImmediate(pump);
     }
   }
   return {
     enqueueResearch(request) {
       available();
-      const j = store.addJob("research", request);
+      if (!aiStatus(config).researchEnabled)
+        throw new AppError(409, aiStatus(config).researchHint);
+      const j = store.addJob("research", request, {
+        provider: aiStatus(config).provider,
+        model: aiStatus(config).researchModel,
+      });
       setImmediate(pump);
       return j;
     },
@@ -201,7 +206,11 @@ export function createAgent(store, provider, config) {
           409,
           "Esiste già una bozza in lavorazione per questa struttura.",
         );
-      const j = store.addJob("draft", { partnerId: id, partner, knowledge });
+      const j = store.addJob(
+        "draft",
+        { partnerId: id, partner, knowledge },
+        { provider: aiStatus(config).provider, model: config.model },
+      );
       setImmediate(pump);
       return j;
     },
@@ -229,8 +238,10 @@ export function createAgent(store, provider, config) {
           this.cancel(j.id);
     },
     shutdown() {
+      stopped = true;
       if (activeId) controller?.abort();
     },
-    idle: () => !busy && !store.jobs().some((j) => j.status === "queued"),
+    idle: () =>
+      !busy && (stopped || !store.jobs().some((j) => j.status === "queued")),
   };
 }

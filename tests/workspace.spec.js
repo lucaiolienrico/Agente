@@ -7,11 +7,15 @@ import { readFileSync } from "node:fs";
 
 const test = base.extend({
   ai: [false, { option: true }],
+  aiProvider: ["openai", { option: true }],
+  groqSearch: [false, { option: true }],
   preview: [false, { option: true }],
-  workspace: async ({ ai, preview }, use) => {
+  workspace: async ({ ai, preview, aiProvider, groqSearch }, use) => {
     const store = createStore(":memory:");
     const cfg = {
       ...config,
+      provider: aiProvider,
+      searchEnabled: groqSearch,
       apiKey: ai ? "isolated-fixture-key" : "",
       preview,
     };
@@ -33,6 +37,7 @@ const test = base.extend({
       await use({ store, agent, url: cfg.origin });
     } finally {
       agent.pause(true);
+      agent.shutdown();
       await idle(agent);
       await new Promise((resolve) => {
         server.close(resolve);
@@ -277,4 +282,48 @@ test("Pages root e docs sono un avviso, non la console o un redirect", async () 
     expect(html).not.toContain("/assets/");
     expect(html).not.toContain("OPENAI_API_KEY=sk-");
   }
+});
+
+test.describe("Groq, capacità separate", () => {
+  test.use({ ai: true, aiProvider: "groq" });
+  test("bozze abilitate ma ricerca spenta, messaggi Groq corretti", async ({
+    page,
+    workspace,
+  }) => {
+    await login(page, workspace);
+    await expect(
+      page.getByRole("button", { name: "Avvia ricerca web" }),
+    ).toBeDisabled();
+    await expect(
+      page.getByText("Groq è disponibile per le bozze.", { exact: false }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Istruzioni di attivazione" })
+      .click();
+    await expect(page.getByRole("dialog")).toContainText("GROQ_API_KEY");
+    await expect(page.getByRole("dialog")).not.toContainText("Collega OpenAI");
+    await page.getByRole("button", { name: "Ho capito" }).click();
+    await approveKnowledge(page);
+    await page
+      .getByRole("link", { name: "Strutture", exact: false })
+      .first()
+      .click();
+    await addPartner(page);
+    await page.getByRole("button", { name: "Apri scheda" }).click();
+    await expect(
+      page.getByRole("button", { name: "Genera bozza IA" }),
+    ).toBeEnabled();
+    await page.getByRole("button", { name: "Genera bozza IA" }).click();
+    await idle(workspace.agent);
+    await page
+      .getByRole("link", { name: "Bozze e approvazioni", exact: false })
+      .first()
+      .click();
+    await expect(page.getByLabel("Oggetto", { exact: true })).toHaveValue(
+      text.subject,
+    );
+    await expect(
+      page.getByRole("button", { name: "Approva testo" }),
+    ).toBeDisabled();
+  });
 });

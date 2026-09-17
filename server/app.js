@@ -1,3 +1,4 @@
+import { aiStatus, GROQ_DEFAULT_MODEL } from "./ai-config.js";
 import express from "express";
 import helmet from "helmet";
 import { randomBytes, timingSafeEqual, createHash } from "node:crypto";
@@ -41,13 +42,27 @@ export function configFromEnv(env = process.env) {
   const dailyLimit = Number(env.DAILY_AI_LIMIT || 10);
   if (!Number.isInteger(dailyLimit) || dailyLimit < 1 || dailyLimit > 100)
     throw new Error("DAILY_AI_LIMIT deve essere tra 1 e 100.");
+  const provider = (env.AI_PROVIDER || "groq").trim().toLowerCase();
+  if (!["groq", "openai"].includes(provider))
+    throw new Error("AI_PROVIDER deve essere groq oppure openai.");
+  if (
+    env.GROQ_SEARCH_ENABLED &&
+    !["true", "false"].includes(env.GROQ_SEARCH_ENABLED)
+  )
+    throw new Error("GROQ_SEARCH_ENABLED deve essere true oppure false.");
   return {
+    provider,
+    searchEnabled: provider === "openai" || env.GROQ_SEARCH_ENABLED === "true",
     production,
     preview,
     origin,
     password: env.ADMIN_PASSWORD || "",
-    apiKey: env.OPENAI_API_KEY || "",
-    model: env.OPENAI_MODEL || "",
+    apiKey:
+      provider === "groq" ? env.GROQ_API_KEY || "" : env.OPENAI_API_KEY || "",
+    model:
+      provider === "groq"
+        ? env.GROQ_MODEL || GROQ_DEFAULT_MODEL
+        : env.OPENAI_MODEL || "",
     dailyLimit,
   };
 }
@@ -185,9 +200,7 @@ export function createApp({ store, agent, config, dist = resolve("dist") }) {
       agent: {
         paused: store.isPaused(),
         preview: config.preview,
-        configured: !!(config.apiKey && config.model),
-        enabled: !config.preview && !!(config.apiKey && config.model),
-        model: config.model || null,
+        ...aiStatus(config),
         dailyLimit: config.dailyLimit,
         usedToday: store.callCount(),
         usage: store.usage(),
@@ -347,18 +360,16 @@ export function createApp({ store, agent, config, dist = resolve("dist") }) {
           : error.type === "entity.parse.failed"
             ? 400
             : 500;
-    res
-      .status(status)
-      .json({
-        error:
-          error instanceof AppError
-            ? error.message
-            : status === 413
-              ? "Richiesta troppo grande."
-              : status === 400
-                ? "JSON non valido."
-                : "Errore interno. Nessuna operazione esterna dichiarata come riuscita.",
-      });
+    res.status(status).json({
+      error:
+        error instanceof AppError
+          ? error.message
+          : status === 413
+            ? "Richiesta troppo grande."
+            : status === 400
+              ? "JSON non valido."
+              : "Errore interno. Nessuna operazione esterna dichiarata come riuscita.",
+    });
   });
   return app;
 }

@@ -4,10 +4,16 @@ Un agente dedicato a **[PetNote](https://www.petnote.it/partner)**: ricerca vete
 
 **Non è più la console dimostrativa a 67 ruoli.** Il vecchio lavoro è recuperabile dalla cronologia Git, ad esempio dal commit `64edb99` o `b9e1dd2`. La repository dell’app PetNote non è stata modificata.
 
+## Provider predefinito: Groq
+
+**Groq sostituisce OpenAI come scelta iniziale.** Bozze su strutture inserite manualmente; ricerca web Groq Compound Mini opzionale, disattivata inizialmente per richiedere una verifica consapevole di quote e costi. Nessun fallback automatico a OpenAI. Non serve un abbonamento ChatGPT e non viene promessa gratuità illimitata.
+
+**[Configura Groq nel Codespace già esistente](docs/GROQ.md)** — mantieni password, origine HTTPS e archivio; aggiungi la chiave esclusivamente nell’ambiente privato.
+
 ## Cosa fa questa versione
 
 - **Archivio SQLite persistente**, inizialmente vuoto: strutture, fonti, evidenze, qualifica, base di contatto, bozze, lavori e registro.
-- **Ricerca web reale su richiesta** attraverso OpenAI Responses + `web_search`. Massimo 5 strutture per lavoro, 3 chiamate allo strumento e 6.000 token di output per richiesta. Nessun crawler, acquisto di liste, scraping di PEC o raccolta automatica di email.
+- **Ricerca web reale su richiesta**, se abilitata: Groq Compound Mini con `web_search` (una chiamata allo strumento), oppure OpenAI Responses solo se scelto esplicitamente (massimo tre). Massimo 5 strutture per lavoro e 6.000 token di completamento per ricerca. Nessun crawler, acquisto di liste, scraping di PEC o raccolta automatica di email.
 - Importa solo risultati con URL normalizzato presente nelle fonti/citazioni restituite dal provider e coerenti con i filtri. Deduplica nome + città normalizzati. **Una citazione non certifica l’identità o la veridicità: tutti i risultati IA restano da verificare.** Può trovare zero strutture.
 - Genera **bozze contestualizzate**, usando la scheda PetNote approvata dal titolare. Il contenuto pubblico è trattato come non attendibile; resta necessaria la revisione contro allucinazioni e prompt injection.
 - Approva/esporta il testo solo con scheda corrente approvata, struttura qualificata, recapito professionale e richiesta pertinente o consenso documentato. Le modifiche a struttura, testo o scheda revocano le approvazioni. L’opt-out blocca generazione, approvazione ed esportazione.
@@ -25,7 +31,7 @@ Un agente dedicato a **[PetNote](https://www.petnote.it/partner)**: ricerca vete
 
 **Non serve un’altra repository o un’installazione sul tuo computer.** Apri [il ramo dell’agente in Agente](https://github.com/lucaiolienrico/Agente/tree/arena/01a0aba2-agente), poi **Code → Codespaces → Create codespace** su quel ramo. Attendi la preparazione, esegui `npm start` nel terminale e apri la porta **3000** nel browser, mantenendola privata.
 
-La configurazione crea una password amministrativa nel file `.env` privato del Codespace; non la stampa nei log e non la pubblica in Git. Non serve un token GitHub. Ricerca e bozze IA richiedono invece la configurazione separata di OpenAI.
+La configurazione crea una password amministrativa nel file `.env` privato del Codespace; non la stampa nei log e non la pubblica in Git. Non serve un token GitHub. Ricerca e bozze IA richiedono invece la configurazione separata di Groq.
 
 **[Guida passo per passo: usare Agente con Codespaces](docs/CODESPACES.md)**.
 
@@ -69,27 +75,39 @@ Apri `http://localhost:5173`. Vite inoltra `/api` al backend, senza URL localhos
 
 Non è una modalità di esercizio. Le modifiche nell’anteprima non confluiscono nel database protetto.
 
-## Collegare la ricerca e le bozze reali
+## Collegare Groq
 
-Configura esclusivamente nell’ambiente del server:
+Configura esclusivamente nell’ambiente del server/Codespace:
 
 ```dotenv
-OPENAI_API_KEY=
-OPENAI_MODEL=
+AI_PROVIDER=groq
+GROQ_API_KEY=
+GROQ_MODEL=openai/gpt-oss-20b
+GROQ_SEARCH_ENABLED=false
 DAILY_AI_LIMIT=10
 DEV_AUTH_BYPASS=false
 ```
 
-Inserisci la tua chiave e scegli esplicitamente un modello dell’account compatibile con **Responses, web_search e Structured Outputs**. Non viene imposto un modello predefinito né eseguita una chiamata di test a pagamento all’avvio. Lo stato «provider configurato» significa soltanto che le variabili sono presenti.
+Inserisci la tua chiave Groq nel file privato `.env` o nei secrets Codespaces, mai in chat o Git. Il modello predefinito `openai/gpt-oss-20b` gira **su Groq**, non sull’API OpenAI: nessun abbonamento ChatGPT è richiesto. Si possono usare altri modelli Groq compatibili con Structured Outputs strict; incompatibilità o quote esaurite fermano il lavoro, senza fallback o retry.
 
-Il connettore chiama `https://api.openai.com/v1/responses` con `store:false`, timeout di 120 secondi e nessun retry. `store:false` **non è una garanzia di zero conservazione presso il provider**: verifica contratto, impostazioni e trattamento dei dati del tuo account. Non vengono trasmessi password, email del partner, documentazione del consenso, note interne o dati sanitari; nella bozza passano nome, segmento, città, fonte ed evidenze commerciali e la scheda prodotto.
+Con questa configurazione puoi generare bozze (max 2.048 token) su strutture inserite manualmente. Per attivare la ricerca con `groq/compound-mini`, verifica prima disponibilità, quote e costi, poi imposta `GROQ_SEARCH_ENABLED=true` e riavvia. Si abilita solo `web_search`, senza code execution. I risultati devono avere URL nei metadati di ricerca Groq ed essere conformi allo schema; altrimenti vengono scartati o la richiesta fallisce.
 
-Il limite giornaliero riguarda **tentativi API**, non euro e non singole ricerche interne allo strumento. Imposta anche i limiti di spesa nel pannello del provider. Token riportati e registro non sostituiscono la fatturazione. Annullare una richiesta non rimborsa costi già maturati.
+Il connettore chiama `https://api.groq.com/openai/v1/chat/completions`. Lo stato «configurato» indica soltanto che le variabili sono presenti: nessuna chiamata a pagamento viene fatta all’avvio. Consulta [docs/GROQ.md](docs/GROQ.md) per l’aggiornamento di un Codespace già aperto e il primo test.
+
+### Alternativa OpenAI, solo su scelta esplicita
+
+L’adattatore precedente rimane disponibile con `AI_PROVIDER=openai`, `OPENAI_API_KEY` e `OPENAI_MODEL`. Richiede Responses, web_search e Structured Outputs. Le chiavi OpenAI sono **ignorate** quando il provider è Groq; non viene mai effettuato un fallback. Un abbonamento ChatGPT e l’accesso alle API non sono la stessa cosa.
+
+### Costi e dati
+
+Groq ha quote e condizioni da verificare nell’account: non garantiamo gratuità illimitata e non attiviamo piani o acquisti. Anche Codespaces ha quote e possibili costi propri. Il limite giornaliero riguarda tentativi API, non euro o singole chiamate interne dei modelli Compound. Token e registro non sostituiscono la fatturazione. Annullare una richiesta non rimborsa costi già maturati.
+
+Entrambi i connettori usano timeout di 120 secondi e nessun retry. Password, email del contatto, documentazione del consenso e note interne non sono inclusi nei payload delle bozze; passano offerta/vincoli e nome, segmento, città, fonte ed evidenze commerciali. Non inserire dati riservati nelle evidenze. Valuta termini e conservazione del provider scelto; `store:false` è usato solo nell’adattatore OpenAI e non garantisce zero conservazione.
 
 ## Primo ciclo operativo
 
 1. Accedi al server protetto. In **Scheda PetNote**, verifica l’offerta e approvala. Nessuna promessa di commissioni, risultati garantiti o funzionalità illimitate.
-2. In **Panoramica**, avvia una ricerca da **1 struttura** e controlla il registro. Errori, risultati scartati e duplicati sono espliciti.
+2. Aggiungi una struttura manualmente oppure, se hai abilitato la ricerca, in **Panoramica** avvia una ricerca da **1 struttura** e controlla il registro. Errori, risultati scartati e duplicati sono espliciti.
 3. In **Strutture**, apri la fonte e verifica attività, sede e pertinenza. Qualifica solo dopo la verifica umana.
 4. Richiedi una bozza. Si può preparare un testo interno anche prima di documentare una base di contatto, ma non approvarlo/esportarlo.
 5. Documenta solo una richiesta realmente ricevuta e pertinente oppure un consenso valido (origine, data, ambito) e il relativo recapito professionale. Un sito pubblico o un indirizzo email non autorizzano il marketing.
@@ -114,7 +132,9 @@ npm run test:e2e
 
 - `server/domain.js`: validazione, normalizzazione, regole di approvazione.
 - `server/store.js`: SQLite, persistenza, sessioni, registro e budget.
-- `server/provider.js`: connettore Responses e controllo delle fonti.
+- `server/provider.js`: selezione esplicita del provider, senza fallback.
+- `server/groq-provider.js`, `server/openai-provider.js`: adattatori API.
+- `server/provider-common.js`, `server/ai-config.js`: schemi, fonti e capacità disponibili.
 - `server/agent.js`: coda, annullamento, budget e importazione transazionale.
 - `server/app.js`: API autenticata ed esportazioni; `server/index.js`: avvio.
 - `web/`: workspace italiano responsive, senza SDK/chiavi del provider nel browser.

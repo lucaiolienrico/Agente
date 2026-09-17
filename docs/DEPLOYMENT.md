@@ -3,7 +3,7 @@
 ## Architettura
 
 Browser → HTTPS / reverse proxy → singolo processo Node/Express → SQLite su disco persistente.
-Il backend contatta esclusivamente l’endpoint OpenAI Responses. Non c’è alcun collegamento al database PetNote e non è implementato un servizio di invio.
+Il backend contatta Groq Chat Completions per impostazione iniziale; OpenAI Responses è disponibile solo scegliendo esplicitamente AI_PROVIDER=openai. Nessun fallback. Non c’è alcun collegamento al database PetNote e non è implementato un servizio di invio.
 
 **Non distribuire questa applicazione come funzioni serverless con filesystem effimero, su GitHub Pages, o con più repliche che lavorano lo stesso archivio.** La coda e il budget sono pensati per una singola istanza. Non avviare cluster/PM2 multiprocess.
 
@@ -18,13 +18,15 @@ PORT=3000
 DATA_DIR=/app/data
 APP_ORIGIN=https://agente.tuo-dominio.it
 ADMIN_PASSWORD=
-OPENAI_API_KEY=
-OPENAI_MODEL=
+AI_PROVIDER=groq
+GROQ_API_KEY=
+GROQ_MODEL=openai/gpt-oss-20b
+GROQ_SEARCH_ENABLED=false
 DAILY_AI_LIMIT=10
 DEV_AUTH_BYPASS=false
 ```
 
-Sostituisci il dominio e valorizza password lunga casuale, chiave e modello **sul server**, non in chat o nei sorgenti. Il modello deve supportare Responses, web_search e output JSON strutturato. Puoi rimandare il provider: archivio e impostazioni rimangono utilizzabili senza IA.
+Sostituisci il dominio e valorizza password lunga casuale, chiave e modello **sul server**, non in chat o nei sorgenti. Il modello Groq per le bozze deve supportare Structured Outputs strict. Per la ricerca web opzionale è usato Compound Mini: vedi [GROQ.md](GROQ.md). Puoi rimandare il provider: archivio e impostazioni rimangono utilizzabili senza IA.
 
 ```bash
 docker build -t petnote-agent .
@@ -75,11 +77,11 @@ Avvia con un gestore di servizi del server, **una sola istanza** e utente dedica
 
 ## Limiti, guasti e consumi
 
-Coda massima 5 lavori, un solo worker. Il budget conteggia tentativi iniziati al provider, anche se falliscono, su giorno UTC. Ricerca max 5 strutture; web tool max 3 chiamate; output max 6.000 token; timeout 120 secondi. Il limite non garantisce una spesa massima in euro: configura anche i limiti dell’account OpenAI.
+Coda massima 5 lavori, un solo worker. Il budget conteggia tentativi iniziati al provider, anche se falliscono, su giorno UTC. Ricerca max 5 strutture: con Groq Compound Mini un solo tool call; con OpenAI max 3. Completamento max 6.000 token per ricerca, 2.048 per bozze Groq; timeout 120 secondi. Il limite non garantisce una spesa massima in euro: configura anche i limiti dell’account del provider scelto.
 
 `Sospendi agente` annulla coda e lavoro attivo; `Annulla` interrompe un singolo lavoro. Il risultato di un lavoro annullato non viene importato, anche se il provider lo restituisce dopo l’annullamento. Costi già maturati non sono rimborsabili automaticamente.
 
-Un riavvio marca i lavori in coda/in corso come interrotti e **non li rilancia**. Anche i risultati incerti richiedono una nuova richiesta consapevole. Non vengono stampati token, password o risposte d’errore grezze del provider. Per HTTP 400 verifica compatibilità modello/strumenti; per 401 ruota/verifica la chiave sul server; per 429 controlla quota e fatturazione.
+Un riavvio marca i lavori in coda/in corso come interrotti e **non li rilancia**. Anche i risultati incerti richiedono una nuova richiesta consapevole. Non vengono stampati token, password o risposte d’errore grezze del provider. Per HTTP 400 verifica compatibilità modello/formato/strumenti; per 401 ruota/verifica la chiave sul server; per 429 controlla quota e fatturazione.
 
 ## Checklist prima della messa in esercizio
 

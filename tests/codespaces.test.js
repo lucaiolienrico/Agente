@@ -39,6 +39,9 @@ test("Codespaces prepara HTTPS, password casuale, produzione e IA non configurat
   assert.equal(file.OPENAI_API_KEY, "");
   const config = configFromEnv(file);
   assert.equal(config.production, true);
+  assert.equal(config.provider, "groq");
+  assert.equal(file.GROQ_API_KEY, "");
+  assert.equal(config.searchEnabled, false);
   assert.equal(config.preview, false);
   assert.equal(statSync(join(directory, ".env")).mode & 0o777, 0o600);
   assert.ok(!JSON.stringify(result).includes(file.ADMIN_PASSWORD));
