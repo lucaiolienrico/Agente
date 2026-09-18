@@ -1,0 +1,13 @@
+{
+  "name": "PetNote Partnership · Agente",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:1-22-bookworm",
+  "remoteUser": "node",
+  "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "PetNote Partnership",
+      "onAutoForward": "openBrowser"
+    }
+  },
+  "postCreateCommand": "npm ci && npm run build && node scripts/setup-codespaces.js"
+}
