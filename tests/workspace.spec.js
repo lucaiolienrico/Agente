@@ -327,3 +327,23 @@ test.describe("Groq, capacità separate", () => {
     ).toBeDisabled();
   });
 });
+test("vista Contatti e invii: invii disattivati, stati vuoti e nessuna azione inventata", async ({
+  page,
+  workspace,
+}) => {
+  const errors = [];
+  page.on("pageerror", (e) => errors.push(e.message));
+  await login(page, workspace);
+  await page.getByRole("link", { name: "Contatti e invii", exact: false }).first().click();
+  await expect(
+    page.getByRole("heading", { name: "Contatti autorizzati, non liste." }),
+  ).toBeVisible();
+  await expect(page.getByText("Invii disattivati.", { exact: true })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Prepara messaggio" })).toBeDisabled();
+  await expect(page.getByRole("button", { name: "Ferma tutti gli invii" })).toBeDisabled();
+  await expect(page.getByText("Nessun contatto", { exact: false })).toBeVisible();
+  await expect(page.getByText("Nessuna risposta ricevuta", { exact: false })).toBeVisible();
+  expect(workspace.store.contacts()).toHaveLength(0);
+  expect(workspace.store.outreachMessages()).toHaveLength(0);
+  expect(errors).toEqual([]);
+});

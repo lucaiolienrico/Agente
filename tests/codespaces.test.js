@@ -43,6 +43,10 @@ test("Codespaces prepara HTTPS, password casuale, produzione e IA non configurat
   assert.equal(file.GROQ_API_KEY, "");
   assert.equal(config.searchEnabled, false);
   assert.equal(config.preview, false);
+  assert.equal(file.OUTREACH_ENABLED, "false");
+  assert.equal(config.outreach.enabled, false);
+  assert.equal(file.RESEND_API_KEY, "");
+  assert.equal(file.WA_ACCESS_TOKEN, "");
   assert.equal(statSync(join(directory, ".env")).mode & 0o777, 0o600);
   assert.ok(!JSON.stringify(result).includes(file.ADMIN_PASSWORD));
 });

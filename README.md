@@ -1,6 +1,6 @@
 # PetNote Partnership Agent
 
-Un agente dedicato a **[PetNote](https://www.petnote.it/partner)**: ricerca veterinari e pet shop in tutta Italia, costruisce un archivio commerciale e prepara proposte di partnership gratuita da sottoporre a revisione umana.
+Un agente dedicato a **[PetNote](https://www.petnote.it/partner)**: ricerca veterinari e pet shop in tutta Italia, costruisce un archivio commerciale, prepara proposte di partnership gratuita da sottoporre a revisione umana e — solo se attivato e autorizzato — contatta i partner su email e WhatsApp Business.
 
 **Non è più la console dimostrativa a 67 ruoli.** Il vecchio lavoro è recuperabile dalla cronologia Git, ad esempio dal commit `64edb99` o `b9e1dd2`. La repository dell’app PetNote non è stata modificata.
 
@@ -19,13 +19,31 @@ Un agente dedicato a **[PetNote](https://www.petnote.it/partner)**: ricerca vete
 - Approva/esporta il testo solo con scheda corrente approvata, struttura qualificata, recapito professionale e richiesta pertinente o consenso documentato. Le modifiche a struttura, testo o scheda revocano le approvazioni. L’opt-out blocca generazione, approvazione ed esportazione.
 - Esporta l’archivio in CSV con protezione dalle formule e le bozze approvate in TXT.
 - Una coda, un solo lavoro alla volta, budget iniziale di 10 richieste IA al giorno UTC. Sospensione e annullamento disponibili. **Nessun retry automatico**, nemmeno dopo un riavvio; le richieste fallite già iniziate contano nel limite.
+- **Contatti multicanale opzionali** (email Resend + WhatsApp Business API Cloud), **disattivati per impostazione predefinita**: inviano solo a contatti con richiesta pertinente o consenso documentato, dopo approvazione del singolo messaggio, entro limite giornaliero e orario lavorativo. Risposte ed esiti di consegna arrivano da webhook firmati. Vedi [docs/OUTREACH.md](docs/OUTREACH.md).
 - Accesso con password amministrativa, sessioni server-side di 8 ore, cookie HttpOnly/SameSite Strict, Secure in produzione, controllo dell’origine e limiti ai tentativi di accesso.
 
 ### Cosa NON fa
 
-**Non invia email, PEC, WhatsApp, notifiche o campagne. Non esiste un endpoint di invio.** Non registra contatti esterni come avvenuti, non attribuisce attivazioni/Premium e non genera ricavi fittizi. Non accede a proprietari, animali, dati sanitari o al database PetNote.
+**Di default non invia nulla.** Il flusso principale (ricerca → qualifica → bozza → approvazione → export) **non invia email o messaggi**: produce testo da usare manualmente. Il modulo di contatto multicanale è **spento** finché non imposti `OUTREACH_ENABLED=true` con i relativi provider sul server; anche allora non invia a strutture senza richiesta pertinente o consenso documentato, non invia senza approvazione del singolo messaggio, non raccoglie email/PEC/numeri dal web e non dichiara come consegnato un messaggio che il provider non ha confermato.
+
+Non attribuisce attivazioni/Premium e non genera ricavi fittizi. Non accede a proprietari, animali, dati sanitari o al database PetNote.
 
 **PayPal e push telefono sono già presenti in PetNote**, come confermato dal titolare; qui non vengono ricostruiti. Un futuro collegamento di eventi richiederà un’integrazione separata e autorizzata. I flussi autenticati, i pagamenti e le notifiche non sono stati verificati end-to-end da questo progetto.
+
+## Contatti multicanale (email + WhatsApp)
+
+Oltre a preparare proposte, l’agente può **contattare i partner già autorizzati** su email (Resend) e WhatsApp Business (API Cloud Meta), e registrarne le risposte. È una funzione **opzionale e disattivata per impostazione predefinita** (`OUTREACH_ENABLED=false`), pensata per un uso consapevole e conforme.
+
+Garanzie principali:
+
+- invia solo a contatti con `basis = inbound` (richiesta ricevuta) o `consent` (consenso documentato), con evidenza e scadenza valida;
+- ogni messaggio in uscita richiede **approvazione umana** del singolo testo (o di una campagna comunque vincolata alle autorizzazioni);
+- **re-check immediato** di autorizzazione, opt-out, canale, limite giornaliero e orario lavorativo prima di ogni consegna;
+- **opt-out vincolante** e irreversibile da UI, applicato anche quando arriva un’opposizione via webhook;
+- webhook **firmati** (Svix per Resend, `X-Hub-Signature-256` per WhatsApp), eventi deduplicati, esiti distinti (`sent`/`delivered`/`read`/`failed`/`unknown`);
+- **nessun retry cieco** e nessun invio dichiarato riuscito senza conferma del provider.
+
+Configurazione, endpoint, costi reali e limiti sono descritti in **[docs/OUTREACH.md](docs/OUTREACH.md)**. Non è stata eseguita una spedizione reale verso Resend o Meta: la prima consegna va provata con cautela su pochi contatti davvero autorizzati.
 
 ## Usarlo direttamente dalla repo Agente (GitHub Codespaces)
 
@@ -112,6 +130,7 @@ Entrambi i connettori usano timeout di 120 secondi e nessun retry. Password, ema
 4. Richiedi una bozza. Si può preparare un testo interno anche prima di documentare una base di contatto, ma non approvarlo/esportarlo.
 5. Documenta solo una richiesta realmente ricevuta e pertinente oppure un consenso valido (origine, data, ambito) e il relativo recapito professionale. Un sito pubblico o un indirizzo email non autorizzano il marketing.
 6. Rivedi il testo in **Bozze e approvazioni**. Conferma la revisione; scarica il TXT. **Nessun messaggio viene inviato dal sistema.**
+7. (Opzionale, solo con invii attivi) In **Contatti e invii** aggiungi un recapito autorizzato a una struttura qualificata, prepara un messaggio da un modello approvato e approvalo: sarà consegnato entro limite giornaliero, orario lavorativo e autorizzazione ancora valida. Un’opposizione ricevuta mette il contatto in opt-out e annulla gli invii pendenti.
 
 La registrazione del consenso è un’attestazione dell’amministratore, non una verifica giuridica automatica. Non usare la funzione per giustificare contatti non autorizzati.
 
@@ -136,7 +155,8 @@ npm run test:e2e
 - `server/groq-provider.js`, `server/openai-provider.js`: adattatori API.
 - `server/provider-common.js`, `server/ai-config.js`: schemi, fonti e capacità disponibili.
 - `server/agent.js`: coda, annullamento, budget e importazione transazionale.
-- `server/app.js`: API autenticata ed esportazioni; `server/index.js`: avvio.
+- `server/outreach.js`, `server/outreach-domain.js`, `server/outreach-channels.js`: contatti multicanale, autorizzazioni, approvazione, limiti, webhook firmati e adapter Resend/WhatsApp.
+- `server/app.js`: API autenticata, webhook provider ed esportazioni; `server/index.js`: avvio.
 - `web/`: workspace italiano responsive, senza SDK/chiavi del provider nel browser.
 - `tests/`: unitari, integrazione API e browser. Il provider nei test è una fixture isolata; nessuna chiamata a pagamento.
 
@@ -146,6 +166,6 @@ La configurazione dei test è disponibile in [`docs/ci-workflow.example.yml`](do
 
 ## Limiti della prima versione
 
-Un amministratore, una singola istanza/processo Node, un solo database locale. Niente ruoli multiutente, Redis, scheduler periodico, sincronizzazione CRM, gestione allegati del consenso, antivirus, attribuzione di conversioni o messaggistica. Deduplicazione per nome/città, non per partita IVA. Il registro è operativo e modificabile da chi controlla il server, **non un audit immutabile**.
+Un amministratore, una singola istanza/processo Node, un solo database locale. Niente ruoli multiutente, Redis, scheduler periodico, sincronizzazione CRM, gestione allegati del consenso, antivirus o attribuzione di conversioni. La messaggistica multicanale è presente ma opzionale, mono-istanza e senza instradamento multi-fornitore. Deduplicazione per nome/città, non per partita IVA. Il registro è operativo e modificabile da chi controlla il server, **non un audit immutabile**.
 
 Non è una certificazione di sicurezza o conformità GDPR. Prima di caricare dati commerciali reali definisci responsabilità, conservazione, gestione delle opposizioni e backup; usa un recapito professionale autorizzato e non inserire dati sanitari. Il database contiene dati commerciali e sessioni: proteggi disco, backup e accesso al server. La prima verifica con un provider reale e la pubblicazione su hosting definitivo richiedono una configurazione sicura del titolare.

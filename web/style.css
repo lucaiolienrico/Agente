@@ -669,6 +669,25 @@ textarea:focus {
   background: #f4f6f3;
   color: #8a988e;
 }
+.badge.sent,
+.badge.delivered,
+.badge.read {
+  background: #e9f3eb;
+  color: #37734b;
+}
+.badge.sending,
+.badge.received {
+  background: #e8f1f7;
+  color: #3c748f;
+}
+.badge.blocked {
+  background: #f9eeeb;
+  color: #a55e4c;
+}
+.badge.cancelled {
+  background: #f0f2ef;
+  color: #718276;
+}
 .empty {
   text-align: center;
   padding: 65px 25px;

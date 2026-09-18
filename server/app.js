@@ -14,6 +14,16 @@ import {
   canApprove,
   regions,
 } from "./domain.js";
+import {
+  contactSchema,
+  templateSchema,
+  messageSchema,
+  campaignSchema,
+  outreachConfig,
+  outreachStatus,
+} from "./outreach-domain.js";
+import { createOutreachChannels } from "./outreach-channels.js";
+import { createOutreach } from "./outreach.js";
 
 export function configFromEnv(env = process.env) {
   const production = env.NODE_ENV === "production";
@@ -39,6 +49,11 @@ export function configFromEnv(env = process.env) {
     );
   if (env.ADMIN_PASSWORD && env.ADMIN_PASSWORD.length < 12)
     throw new Error("ADMIN_PASSWORD deve contenere almeno 12 caratteri.");
+  const outreach = outreachConfig(env);
+  if (outreach.enabled && preview)
+    throw new Error(
+      "OUTREACH_ENABLED=true non è ammesso con DEV_AUTH_BYPASS=true: gli invii richiedono un accesso protetto.",
+    );
   const dailyLimit = Number(env.DAILY_AI_LIMIT || 10);
   if (!Number.isInteger(dailyLimit) || dailyLimit < 1 || dailyLimit > 100)
     throw new Error("DAILY_AI_LIMIT deve essere tra 1 e 100.");
@@ -55,6 +70,7 @@ export function configFromEnv(env = process.env) {
     searchEnabled: provider === "openai" || env.GROQ_SEARCH_ENABLED === "true",
     production,
     preview,
+    outreach,
     origin,
     password: env.ADMIN_PASSWORD || "",
     apiKey:
@@ -68,6 +84,26 @@ export function configFromEnv(env = process.env) {
 }
 function hash(text) {
   return createHash("sha256").update(text).digest();
+}
+function asyncWrap(handler) {
+  return async (req, res, next) => {
+    try {
+      const body = Buffer.isBuffer(req.body) ? req.body : null;
+      const headers = Object.fromEntries(
+        Object.entries(req.headers).map(([k, v]) => [k.toLowerCase(), v]),
+      );
+      if (req.method === "GET") {
+        const challenge = await handler(req.query);
+        res.type("text/plain").send(challenge);
+        return;
+      }
+      if (!body) throw new AppError(415, "Corpo del webhook mancante.");
+      const result = await handler(body, headers);
+      res.json(result && typeof result === "object" ? result : { ok: true });
+    } catch (error) {
+      next(error);
+    }
+  };
 }
 function sessionToken(req) {
   return (
@@ -83,8 +119,23 @@ export function csvCell(value) {
   if (/^[\s]*[=+@\-]|^[\t\r\n]/.test(text)) text = "'" + text;
   return '"' + text.replaceAll('"', '""') + '"';
 }
-export function createApp({ store, agent, config, dist = resolve("dist") }) {
+export function createApp({
+  store,
+  agent,
+  config,
+  outreach,
+  dist = resolve("dist"),
+}) {
   const app = express();
+  const outreachConfigValue = config.outreach || outreachConfig({});
+  const outreachEngine =
+    outreach ||
+    createOutreach({
+      store,
+      config,
+      outreach: outreachConfigValue,
+      channels: createOutreachChannels(config, outreachConfigValue),
+    });
   app.disable("x-powered-by");
   // Do not trust client-supplied forwarded headers. Single admin; login budget is global.
   app.use(
@@ -108,6 +159,19 @@ export function createApp({ store, agent, config, dist = resolve("dist") }) {
     res.set("Cache-Control", "no-store");
     next();
   });
+  // Provider callbacks are verified by signature, not by session, and need the
+  // untouched body: mount the raw readers before the global JSON parser.
+  app.get("/api/webhooks/whatsapp", asyncWrap(outreachEngine.handleWhatsAppVerification));
+  app.post(
+    "/api/webhooks/whatsapp",
+    express.raw({ type: "*/*", limit: "64kb" }),
+    asyncWrap(outreachEngine.handleWhatsAppWebhook),
+  );
+  app.post(
+    "/api/webhooks/resend",
+    express.raw({ type: "*/*", limit: "64kb" }),
+    asyncWrap(outreachEngine.handleResendWebhook),
+  );
   app.use(express.json({ limit: "32kb", strict: true }));
   app.use("/api", (req, res, next) => {
     if (!["GET", "HEAD", "OPTIONS"].includes(req.method)) {
@@ -205,6 +269,13 @@ export function createApp({ store, agent, config, dist = resolve("dist") }) {
         usedToday: store.callCount(),
         usage: store.usage(),
       },
+      outreach: outreachEngine.status(),
+      contacts: store.contacts(),
+      templates: store.templates(),
+      messages: store.outreachMessages().slice(0, 200),
+      conversations: store.conversations(),
+      campaigns: store.campaigns(),
+      outreachEvents: store.outreachEvents(100),
     }),
   );
   app.post("/api/partners", (req, res) => {
@@ -329,13 +400,62 @@ export function createApp({ store, agent, config, dist = resolve("dist") }) {
         "\uFEFF" + rows.map((row) => row.map(csvCell).join(",")).join("\r\n"),
       );
   });
+  // --- Contatti multicanale: autorizzazioni, modelli, messaggi approvati ---
+  app.get("/api/outreach/status", (_req, res) => res.json(outreachEngine.status()));
+  app.post("/api/outreach/pause", (req, res) => {
+    if (typeof req.body?.paused !== "boolean")
+      throw new AppError(400, "Specifica paused: true oppure false.");
+    res.json(outreachEngine.pause(req.body.paused));
+  });
+  app.get("/api/outreach/contacts", (_req, res) => res.json(store.contacts()));
+  app.post("/api/outreach/contacts", (req, res) =>
+    res.status(201).json(outreachEngine.addContact(parse(contactSchema, req.body))),
+  );
+  app.put("/api/outreach/contacts/:id", (req, res) =>
+    res.json(outreachEngine.updateContact(req.params.id, parse(contactSchema, req.body))),
+  );
+  app.get("/api/outreach/contacts/:id/reachability", (req, res) =>
+    res.json(outreachEngine.reachable(req.params.id, req.query.messageId || null)),
+  );
+  app.get("/api/outreach/templates", (_req, res) => res.json(store.templates()));
+  app.post("/api/outreach/templates", (req, res) =>
+    res.status(201).json(outreachEngine.addTemplate(parse(templateSchema, req.body))),
+  );
+  app.put("/api/outreach/templates/:id", (req, res) =>
+    res.json(outreachEngine.updateTemplate(req.params.id, parse(templateSchema, req.body))),
+  );
+  app.get("/api/outreach/messages", (_req, res) =>
+    res.json(store.outreachMessages().slice(0, 300)),
+  );
+  app.post("/api/outreach/messages", (req, res) => {
+    const input = parse(messageSchema, req.body);
+    const created = outreachEngine.createMessage(input, { autoApprove: input.confirmed === true });
+    res.status(created.duplicate ? 200 : 201).json(created);
+  });
+  app.post("/api/outreach/messages/:id/approve", (req, res) => {
+    if (req.body?.confirmed !== true)
+      throw new AppError(
+        400,
+        "Conferma di avere riletto il testo e verificato autorizzazione e recapito.",
+      );
+    res.json(outreachEngine.approve(req.params.id));
+  });
+  app.post("/api/outreach/messages/:id/cancel", (req, res) =>
+    res.json(outreachEngine.cancel(req.params.id)),
+  );
+  app.get("/api/outreach/campaigns", (_req, res) => res.json(store.campaigns()));
+  app.post("/api/outreach/campaigns", (req, res) =>
+    res.status(201).json(outreachEngine.createCampaign(parse(campaignSchema, req.body))),
+  );
+  app.get("/api/outreach/conversations", (_req, res) =>
+    res.json({
+      conversations: store.conversations(),
+      messages: store.outreachMessages().slice(0, 300),
+      events: store.outreachEvents(100),
+    }),
+  );
   app.use("/api", (_req, _res, next) =>
-    next(
-      new AppError(
-        404,
-        "Endpoint non disponibile. Nessun servizio di invio è implementato.",
-      ),
-    ),
+    next(new AppError(404, "Endpoint non disponibile.")),
   );
   if (existsSync(resolve(dist, "index.html"))) {
     app.use(express.static(dist, { index: "index.html" }));
@@ -371,5 +491,6 @@ export function createApp({ store, agent, config, dist = resolve("dist") }) {
               : "Errore interno. Nessuna operazione esterna dichiarata come riuscita.",
     });
   });
+  app.locals.outreach = outreachEngine;
   return app;
 }

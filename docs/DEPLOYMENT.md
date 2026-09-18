@@ -23,10 +23,24 @@ GROQ_API_KEY=
 GROQ_MODEL=openai/gpt-oss-20b
 GROQ_SEARCH_ENABLED=false
 DAILY_AI_LIMIT=10
+# Contatti multicanale opzionali: disattivati. Vedi docs/OUTREACH.md per attivarli.
+OUTREACH_ENABLED=false
+OUTREACH_DAILY_LIMIT=20
+OUTREACH_BUSINESS_HOURS=true
+RESEND_API_KEY=
+RESEND_FROM=
+RESEND_REPLY_TO=
+RESEND_WEBHOOK_SECRET=
+WA_ACCESS_TOKEN=
+WA_PHONE_NUMBER_ID=
+WA_BUSINESS_ACCOUNT_ID=
+WA_GRAPH_VERSION=v23.0
+WA_APP_SECRET=
+WA_VERIFY_TOKEN=
 DEV_AUTH_BYPASS=false
 ```
 
-Sostituisci il dominio e valorizza password lunga casuale, chiave e modello **sul server**, non in chat o nei sorgenti. Il modello Groq per le bozze deve supportare Structured Outputs strict. Per la ricerca web opzionale è usato Compound Mini: vedi [GROQ.md](GROQ.md). Puoi rimandare il provider: archivio e impostazioni rimangono utilizzabili senza IA.
+Sostituisci il dominio e valorizza password lunga casuale, chiave e modello **sul server**, non in chat o nei sorgenti. I contatti multicanale restano spenti finché non imposti `OUTREACH_ENABLED=true` con i provider email/WhatsApp e i relativi webhook firmati: vedi [OUTREACH.md](OUTREACH.md). Il modello Groq per le bozze deve supportare Structured Outputs strict. Per la ricerca web opzionale è usato Compound Mini: vedi [GROQ.md](GROQ.md). Puoi rimandare il provider: archivio e impostazioni rimangono utilizzabili senza IA.
 
 ```bash
 docker build -t petnote-agent .

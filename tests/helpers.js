@@ -147,3 +147,114 @@ export async function fixture(
   });
   return { store, agent, app, request, login, base, getCookie: () => cookie };
 }
+
+// --- Fixture isolate per il modulo contatti multicanale ---
+export const outreachConfigFixture = {
+  enabled: true,
+  test: true,
+  businessHours: false,
+  dailyLimit: 20,
+  resendKey: "re_fixture_not_real",
+  emailFrom: "partner@petnote.example",
+  emailReplyTo: "partner@petnote.example",
+  resendWebhookSecret: "fixture-secret-0123456789",
+  waToken: "wa-fixture-token-not-real",
+  waPhoneId: "100000000000001",
+  waBusinessId: "100000000000002",
+  waVersion: "v23.0",
+  waAppSecret: "fixture-app-secret-0123456789",
+  waVerifyToken: "fixture-verify-token-0123456789",
+};
+export function mockChannels() {
+  const calls = [];
+  return {
+    calls,
+    email: {
+      name: "email",
+      ready: true,
+      async send(payload) {
+        calls.push({ channel: "email", ...payload });
+        return { providerMessageId: `resend-${calls.length}`, status: "sent", provider: "resend" };
+      },
+      async fetchReceived() {
+        return "Corpo della email recuperato dalla fixture isolata.";
+      },
+    },
+    whatsapp: {
+      name: "whatsapp",
+      ready: true,
+      async send(payload) {
+        calls.push({ channel: "whatsapp", ...payload });
+        return {
+          providerMessageId: `wamid-${calls.length}`,
+          status: "sent",
+          provider: "whatsapp-cloud",
+        };
+      },
+    },
+  };
+}
+export async function outreachFixture(t, overrides = {}) {
+  const { createOutreach } = await import("../server/outreach.js");
+  const store = createStore(":memory:");
+  const cfg = { ...config, outreach: { ...outreachConfigFixture, ...overrides } };
+  const channels = overrides.channels || mockChannels();
+  let current = new Date("2026-09-17T10:00:00.000Z");
+  const engine = createOutreach({
+    store,
+    config: cfg,
+    outreach: cfg.outreach,
+    channels,
+    now: () => current,
+    tickMs: 5,
+  });
+  engine.start();
+  const p = store.addPartner(
+    {
+      ...partner,
+      company: overrides.company || "Clinica Veterinaria Fixture",
+      status: "qualificato",
+      contactBasis: "inbound",
+      contactEmail: "clinica@example.org",
+      contactEvidence: "Richiesta informazioni ricevuta via modulo pubblico il 2026-09-10.",
+    },
+    { origin: "manual" },
+  );
+  t.after(() => {
+    engine.shutdown();
+    store.close();
+  });
+  return {
+    store,
+    engine,
+    channels,
+    config: cfg,
+    partnerRecord: p,
+    setTime: (value) => (current = new Date(value)),
+    addContact: (extra = {}) =>
+      store.addContact({
+        partnerId: p.id,
+        channel: "email",
+        address: "clinica@example.org",
+        basis: "inbound",
+        evidence: "Richiesta informazioni ricevuta via modulo pubblico il 2026-09-10.",
+        obtainedAt: "2026-09-10T09:00:00.000Z",
+        expiresAt: null,
+        ...extra,
+      }),
+    addTemplate: (extra = {}) =>
+      store.addTemplate({
+        name: "Presentazione PetNote",
+        channel: "email",
+        subject: "PetNote: programma partner gratuito",
+        body: "Testo approvato dalla fixture isolata per i test automatici.",
+        waName: "",
+        language: "it",
+        ...extra,
+      }),
+    async settle() {
+      for (let i = 0; i < 400 && !engine.idle(); i++) await setTimeout(5);
+      if (!engine.idle()) throw new Error("Coda invii non svuotata nel tempo del test");
+    },
+  };
+}

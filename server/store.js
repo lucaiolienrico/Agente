@@ -3,6 +3,7 @@ import { mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { randomUUID, createHash } from "node:crypto";
 import { defaultKnowledge, duplicateKey, AppError } from "./domain.js";
+import { outreachKey } from "./outreach-domain.js";
 
 const now = () => new Date().toISOString();
 export function createStore(filename) {
@@ -17,6 +18,17 @@ export function createStore(filename) {
     CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, data TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS sessions (hash TEXT PRIMARY KEY, expires INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS calls (id TEXT PRIMARY KEY, time TEXT NOT NULL, input_tokens INTEGER, output_tokens INTEGER);
+    CREATE TABLE IF NOT EXISTS contacts (id TEXT PRIMARY KEY, partner_id TEXT NOT NULL REFERENCES partners(id), channel TEXT NOT NULL, address TEXT NOT NULL, basis TEXT NOT NULL, data TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS outreach_templates (id TEXT PRIMARY KEY, channel TEXT NOT NULL, name TEXT NOT NULL, data TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS outreach_messages (id TEXT PRIMARY KEY, dedupe TEXT UNIQUE NOT NULL, contact_id TEXT NOT NULL REFERENCES contacts(id), status TEXT NOT NULL, direction TEXT NOT NULL, channel TEXT NOT NULL, purpose TEXT NOT NULL, created_at TEXT NOT NULL, scheduled_at TEXT, sent_at TEXT, provider_message_id TEXT, data TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS conversations (id TEXT PRIMARY KEY, contact_id TEXT NOT NULL REFERENCES contacts(id), channel TEXT NOT NULL, data TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS campaigns (id TEXT PRIMARY KEY, status TEXT NOT NULL, name TEXT NOT NULL, created_at TEXT NOT NULL, data TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS outreach_events (dedupe TEXT PRIMARY KEY, channel TEXT NOT NULL, type TEXT NOT NULL, time TEXT NOT NULL, data TEXT NOT NULL);
+    CREATE INDEX IF NOT EXISTS idx_messages_status ON outreach_messages(status, scheduled_at);
+    CREATE INDEX IF NOT EXISTS idx_messages_sent ON outreach_messages(direction, sent_at);
+    CREATE INDEX IF NOT EXISTS idx_messages_provider ON outreach_messages(provider_message_id);
+    CREATE INDEX IF NOT EXISTS idx_contacts_lookup ON contacts(channel, address);
+    CREATE INDEX IF NOT EXISTS idx_conversations_contact ON conversations(contact_id);
   `);
   const json = (r) => (r ? JSON.parse(r.data) : null);
   const log = (entity, message) =>
@@ -253,6 +265,345 @@ export function createStore(filename) {
           .update(token || "")
           .digest("hex"),
       );
+    },
+    // --- Outreach: contact permissions, templates, approved messages, events ---
+    isOutreachPaused: () =>
+      !!json(db.prepare("SELECT data FROM settings WHERE key='outreachPaused'").get()),
+    setOutreachPaused(value) {
+      db.prepare(
+        "INSERT INTO settings(key,data) VALUES('outreachPaused',?) ON CONFLICT(key) DO UPDATE SET data=excluded.data",
+      ).run(JSON.stringify(!!value));
+      log(
+        "CONTATTI",
+        value
+          ? "Invii sospesi: nessun nuovo messaggio verrà consegnato a un provider."
+          : "Invii riattivati. Restano obbligatori autorizzazione e approvazione.",
+      );
+    },
+    outreachSendCount: (since = now().slice(0, 10) + "T00:00:00.000Z") =>
+      db
+        .prepare(
+          "SELECT count(*) AS n FROM outreach_messages WHERE direction='outbound' AND sent_at>=?",
+        )
+        .get(since).n,
+    contacts: () =>
+      db.prepare("SELECT data FROM contacts ORDER BY rowid DESC").all().map(json),
+    contact: (id) => json(db.prepare("SELECT data FROM contacts WHERE id=?").get(id)),
+    findContact(channel, addr) {
+      return json(
+        db
+          .prepare(
+            "SELECT data FROM contacts WHERE channel=? AND address=? ORDER BY rowid DESC LIMIT 1",
+          )
+          .get(channel, String(addr || "").trim().toLowerCase()),
+      );
+    },
+    partnerContacts: (partnerId) => store.contacts().filter((c) => c.partnerId === partnerId),
+    addContact(c) {
+      const existing = store.findContact(c.channel, c.address);
+      if (existing)
+        throw new AppError(
+          409,
+          "Esiste già un contatto con questo canale e recapito. Aggiorna quello esistente.",
+        );
+      const data = { ...c, id: randomUUID(), createdAt: now(), updatedAt: now() };
+      db.prepare(
+        "INSERT INTO contacts(id,partner_id,channel,address,basis,data) VALUES(?,?,?,?,?,?)",
+      ).run(data.id, c.partnerId, c.channel, data.address, c.basis, JSON.stringify(data));
+      log(
+        data.id,
+        `Contatto ${c.channel} registrato. Base: ${c.basis}. Nessun invio eseguito.`,
+      );
+      return data;
+    },
+    updateContact(id, patch) {
+      const old = store.contact(id);
+      if (!old) throw new AppError(404, "Contatto non trovato.");
+      if (old.basis === "opt_out" && patch.basis && patch.basis !== "opt_out")
+        throw new AppError(
+          409,
+          "Opt-out registrato: non può essere annullato da questa interfaccia. Verifica una nuova richiesta esplicita e documentala in una struttura diversa.",
+        );
+      const data = { ...old, ...patch, updatedAt: now() };
+      db.prepare(
+        "UPDATE contacts SET partner_id=?,channel=?,address=?,basis=?,data=? WHERE id=?",
+      ).run(
+        data.partnerId,
+        data.channel,
+        data.address,
+        data.basis,
+        JSON.stringify(data),
+        id,
+      );
+      if (data.basis === "opt_out" && old.basis !== "opt_out") {
+        for (const m of store.outreachMessages().filter(
+          (x) => x.contactId === id && ["queued", "approved"].includes(x.status),
+        ))
+          store.updateOutreachMessage(m.id, {
+            status: "blocked",
+            blockedReason: "Opt-out registrato sul contatto.",
+          });
+      }
+      log(id, `Contatto aggiornato. Base: ${data.basis}.`);
+      return data;
+    },
+    templates: () =>
+      db.prepare("SELECT data FROM outreach_templates ORDER BY rowid DESC").all().map(json),
+    template: (id) =>
+      json(db.prepare("SELECT data FROM outreach_templates WHERE id=?").get(id)),
+    addTemplate(t) {
+      if (
+        store.templates().some((x) => x.channel === t.channel && x.name === t.name)
+      )
+        throw new AppError(409, "Esiste già un modello con questo nome e canale.");
+      const data = { ...t, id: randomUUID(), createdAt: now(), updatedAt: now() };
+      db.prepare(
+        "INSERT INTO outreach_templates(id,channel,name,data) VALUES(?,?,?,?)",
+      ).run(data.id, t.channel, t.name, JSON.stringify(data));
+      log(
+        data.id,
+        `Modello ${t.channel} “${t.name}” salvato${
+          t.channel === "whatsapp" ? ". Richiede un template approvato da Meta." : "."
+        } Nessun invio.`,
+      );
+      return data;
+    },
+    updateTemplate(id, patch) {
+      const old = store.template(id);
+      if (!old) throw new AppError(404, "Modello non trovato.");
+      const data = { ...old, ...patch, updatedAt: now() };
+      db.prepare("UPDATE outreach_templates SET channel=?,name=?,data=? WHERE id=?").run(
+        data.channel,
+        data.name,
+        JSON.stringify(data),
+        id,
+      );
+      log(id, `Modello ${data.channel} “${data.name}” aggiornato.`);
+      return data;
+    },
+    outreachMessages: () =>
+      db.prepare("SELECT data FROM outreach_messages ORDER BY rowid DESC").all().map(json),
+    outreachMessage: (id) =>
+      json(db.prepare("SELECT data FROM outreach_messages WHERE id=?").get(id)),
+    messageByProviderId(providerMessageId) {
+      return json(
+        db
+          .prepare(
+            "SELECT data FROM outreach_messages WHERE provider_message_id=? ORDER BY rowid DESC LIMIT 1",
+          )
+          .get(providerMessageId),
+      );
+    },
+    addOutreachMessage(m) {
+      const dedupe = outreachKey(m);
+      const clash = db
+        .prepare("SELECT data FROM outreach_messages WHERE dedupe=?")
+        .get(dedupe);
+      if (clash) return { message: json(clash), duplicate: true };
+      const data = {
+        ...m,
+        id: randomUUID(),
+        dedupe,
+        status: "queued",
+        direction: "outbound",
+        channel: m.channel,
+        createdAt: now(),
+        updatedAt: now(),
+        approvedAt: null,
+        sentAt: null,
+        deliveredAt: null,
+        providerMessageId: null,
+        provider: null,
+        attempts: 0,
+        restarts: 0,
+        error: null,
+        blockedReason: null,
+      };
+      db.prepare(
+        `INSERT INTO outreach_messages(id,dedupe,contact_id,status,direction,channel,purpose,created_at,scheduled_at,sent_at,provider_message_id,data)
+         VALUES(?,?,?,?,?,?,?,?,?,NULL,NULL,?)`,
+      ).run(
+        data.id,
+        dedupe,
+        data.contactId,
+        data.status,
+        data.direction,
+        data.channel,
+        data.purpose,
+        data.createdAt,
+        data.scheduledAt,
+        JSON.stringify(data),
+      );
+      log(
+        data.id,
+        `Messaggio ${data.channel} (${data.purpose}) in coda: richiede approvazione. Nessun invio.`,
+      );
+      return { message: data, duplicate: false };
+    },
+    addInboundMessage(contact, { body, providerEventId, timestamp, type, subject, note }) {
+      const data = {
+        id: randomUUID(),
+        dedupe: `inbound|${contact.channel}|${providerEventId}`,
+        contactId: contact.id,
+        partnerId: contact.partnerId,
+        channel: contact.channel,
+        direction: "inbound",
+        purpose: "inbound",
+        status: "received",
+        address: contact.address,
+        subject: subject || "",
+        body: body ?? null,
+        type: type || "text",
+        note: note || null,
+        providerEventId,
+        providerMessageId: null,
+        createdAt: timestamp || now(),
+        updatedAt: now(),
+      };
+      db.prepare(
+        `INSERT INTO outreach_messages(id,dedupe,contact_id,status,direction,channel,purpose,created_at,scheduled_at,sent_at,provider_message_id,data)
+         VALUES(?,?,?,?,?,?,?,?,NULL,NULL,NULL,?)`,
+      ).run(
+        data.id,
+        data.dedupe,
+        data.contactId,
+        data.status,
+        data.direction,
+        data.channel,
+        data.purpose,
+        data.createdAt,
+        JSON.stringify(data),
+      );
+      log(data.id, `Risposta ricevuta su ${data.channel}. Nessuna replica automatica inviata.`);
+      return data;
+    },
+    updateOutreachMessage(id, patch) {
+      const old = store.outreachMessage(id);
+      if (!old) throw new AppError(404, "Messaggio non trovato.");
+      const data = { ...old, ...patch, updatedAt: now() };
+      db.prepare(
+        `UPDATE outreach_messages SET status=?,contact_id=?,channel=?,purpose=?,scheduled_at=?,sent_at=?,provider_message_id=?,data=? WHERE id=?`,
+      ).run(
+        data.status,
+        data.contactId,
+        data.channel,
+        data.purpose,
+        data.scheduledAt,
+        data.sentAt,
+        data.providerMessageId,
+        JSON.stringify(data),
+        id,
+      );
+      return data;
+    },
+    markOutreachSent(contactId, sentAt) {
+      const contact = store.contact(contactId);
+      if (contact) store.addConversation(contact, { outbound: sentAt });
+      return sentAt;
+    },
+    conversations: () =>
+      db.prepare("SELECT data FROM conversations ORDER BY rowid DESC").all().map(json),
+    conversation: (id) =>
+      json(db.prepare("SELECT data FROM conversations WHERE id=?").get(id)),
+    addConversation(contact, { inbound, outbound }) {
+      const existing = store
+        .conversations()
+        .find((c) => c.contactId === contact.id && c.channel === contact.channel);
+      const patch = {};
+      if (inbound !== undefined) patch.lastInboundAt = inbound;
+      if (outbound !== undefined) patch.lastOutboundAt = outbound;
+      if (existing) {
+        const data = { ...existing, ...patch, updatedAt: now() };
+        db.prepare("UPDATE conversations SET data=? WHERE id=?").run(
+          JSON.stringify(data),
+          existing.id,
+        );
+        return data;
+      }
+      const data = {
+        id: randomUUID(),
+        contactId: contact.id,
+        partnerId: contact.partnerId,
+        channel: contact.channel,
+        address: contact.address,
+        lastInboundAt: inbound ?? null,
+        lastOutboundAt: outbound ?? null,
+        createdAt: now(),
+        updatedAt: now(),
+      };
+      db.prepare(
+        "INSERT INTO conversations(id,contact_id,channel,data) VALUES(?,?,?,?)",
+      ).run(data.id, data.contactId, data.channel, JSON.stringify(data));
+      return data;
+    },
+    campaigns: () =>
+      db.prepare("SELECT data FROM campaigns ORDER BY rowid DESC").all().map(json),
+    campaign: (id) => json(db.prepare("SELECT data FROM campaigns WHERE id=?").get(id)),
+    addCampaign(c) {
+      const data = {
+        ...c,
+        id: randomUUID(),
+        status: "active",
+        createdAt: now(),
+        updatedAt: now(),
+      };
+      db.prepare(
+        "INSERT INTO campaigns(id,status,name,created_at,data) VALUES(?,?,?,?,?)",
+      ).run(data.id, data.status, data.name, data.createdAt, JSON.stringify(data));
+      log(
+        data.id,
+        `Campagna “${data.name}” creata con ${c.contactIds.length} contatti selezionati. Messaggi in coda, non inviati.`,
+      );
+      return data;
+    },
+    updateCampaign(id, patch) {
+      const old = store.campaign(id);
+      if (!old) throw new AppError(404, "Campagna non trovata.");
+      const data = { ...old, ...patch, updatedAt: now() };
+      db.prepare("UPDATE campaigns SET status=?,name=?,data=? WHERE id=?").run(
+        data.status,
+        data.name,
+        JSON.stringify(data),
+        id,
+      );
+      return data;
+    },
+    recordOutreachEvent(channel, type, dedupe, data) {
+      const clash = db.prepare("SELECT dedupe FROM outreach_events WHERE dedupe=?").get(dedupe);
+      if (clash) return false;
+      db.prepare(
+        "INSERT INTO outreach_events(dedupe,channel,type,time,data) VALUES(?,?,?,?,?)",
+      ).run(dedupe, channel, type, now(), JSON.stringify(data ?? {}));
+      return true;
+    },
+    outreachEvents: (limit = 100) =>
+      db
+        .prepare("SELECT * FROM outreach_events ORDER BY rowid DESC LIMIT ?")
+        .all(limit)
+        .map((row) => ({ ...row, data: JSON.parse(row.data) })),
+    recoverOutreach() {
+      let unknown = 0;
+      let restarted = 0;
+      for (const m of store.outreachMessages()) {
+        if (m.direction !== "outbound") continue;
+        if (m.status === "sending") {
+          store.updateOutreachMessage(m.id, {
+            status: "unknown",
+            error:
+              "Esito sconosciuto: il processo si è interrotto durante la consegna. Verifica il provider prima di qualsiasi nuovo invio.",
+          });
+          log(m.id, "Invio interrotto dal riavvio: esito sconosciuto, nessun retry automatico.");
+          unknown++;
+        } else if (["queued", "approved"].includes(m.status)) {
+          store.updateOutreachMessage(m.id, { restarts: (m.restarts || 0) + 1 });
+          restarted++;
+        }
+      }
+      if (unknown || restarted)
+        log(
+          "CONTATTI",
+          `Ripristino coda: ${unknown} esiti sconosciuti, ${restarted} messaggi ancora in coda.`,
+        );
     },
     close: () => db.close(),
   };
