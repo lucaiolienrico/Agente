@@ -31,6 +31,19 @@ python3 -m http.server 8000
 
 Oppure apri direttamente `index.html` (doppio clic): funziona anche da file.
 
+## 🎬 Video dimostrativo
+
+`demo/agente-video-faro-30s.mp4` — corto da 30s ("Il faro nella tempesta") generato con lo script da riga di comando: 7 scene, Ken Burns, pioggia, fulmini, sottotitoli e colonna sonora sintetizzata.
+
+## 🖥️ Generatore da riga di comando (senza browser)
+
+Lo script `tools/genera_video.py` crea un MP4 con la stessa regia dell'app, usando arte procedurale (niente API esterne):
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install pillow numpy imageio-ffmpeg
+.venv/bin/python tools/genera_video.py --out demo/mio-video.mp4 --dur 30 --seed 42
+```
+
 ## 🧠 Come funziona
 
 1. **Sceneggiatura** — il prompt viene diviso in scene con shot, movimento camera e battuta narrativa
