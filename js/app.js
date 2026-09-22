@@ -8,7 +8,7 @@
 
   var state = {
     ratio: "16:9",
-    dur: 12,
+    dur: 30,
     scenes: [],
     project: null,
     score: null,
@@ -146,8 +146,20 @@
     d.querySelector(".scene-src").textContent = SRC_LABEL[sc.source] || "";
   }
 
-  /* ---------------- Generazione ---------------- */
-  function nScenes() { return Math.max(2, Math.round(state.dur / window.AgenteEngine.SCENE_D)); }
+  /* ---------------- Pianificazione durata ----------------
+     Sceglie n° scene e durata scena in modo che il totale
+     (con dissolvenze da 0.8s) sia ESATTAMENTE la durata scelta:
+       8s  → 2 scene × 4.40s
+       12s → 3 scene × 4.53s
+       16s → 4 scene × 4.60s
+       30s → 7 scene × 4.97s
+  -------------------------------------------------------- */
+  function planDuration(dur) {
+    var X = window.AgenteEngine.TRANS;
+    var n = Math.max(2, Math.round(dur / 4.5));
+    var D = (dur + (n - 1) * X) / n;
+    return { n: n, D: D };
+  }
 
   function setBusy(b) {
     ["btnGenerate", "btnPlay", "btnStop", "btnExport", "btnEnhance", "btnSurprise"].forEach(function (id) {
@@ -172,7 +184,8 @@
 
     var style = $("selStyle").value;
     var camera = $("selCam").value;
-    var need = nScenes();
+    var plan = planDuration(state.dur);
+    var need = plan.n;
     var seedBase = Math.floor(Math.random() * 90000) + 1000;
 
     setBusy(true);
@@ -180,7 +193,7 @@
     if (state.videoURL) { URL.revokeObjectURL(state.videoURL); state.videoURL = null; }
     setStep("script");
     setProgress(0.04);
-    setStatus("✍️ Scrivo la sceneggiatura…");
+    setStatus("✍️ Scrivo la sceneggiatura (" + need + " scene)…");
 
     var useGemini = window.AgenteScript.hasGeminiKey();
     var p = useGemini
@@ -195,7 +208,7 @@
       state.scenes = scenes;
       renderStoryboard(true);
       setStep("images");
-      setStatus("🎨 Genero le immagini AI (può volerci ~1 minuto)…");
+      setStatus("🎨 Genero le immagini AI (può volerci ~1-2 minuti)…");
       var done = 0;
       var jobs = scenes.map(function (sc, i) {
         return window.AgenteProviders.fetchSceneImage(sc, state.ratio, seedBase + i * 17)
@@ -214,7 +227,7 @@
       setStatus("🎞️ Montaggio: camera, dissolvenze, sottotitoli, musica…");
       return new Promise(function (res) { setTimeout(res, 350); });
     }).then(function () {
-      buildProject(style);
+      buildProject(style, plan);
       setStep("ready");
       setProgress(1);
       var aiCount = state.scenes.filter(function (s) { return s.source === "ai"; }).length;
@@ -233,7 +246,7 @@
     });
   }
 
-  function buildProject(style) {
+  function buildProject(style, plan) {
     var size = window.AgenteProviders.RATIO_SIZE[state.ratio];
     var cv = $("stage");
     cv.width = size.w; cv.height = size.h;
@@ -251,7 +264,8 @@
     player.setProject(state.scenes, {
       subs: $("chkSubs").checked,
       letterbox: $("chkBox").checked,
-      grain: $("chkGrain").checked
+      grain: $("chkGrain").checked,
+      sceneDur: plan.D
     });
     var total = player.total();
     $("metaPill").textContent = state.scenes.length + " scene · " + total.toFixed(1) + "s · " + state.ratio;
@@ -276,7 +290,7 @@
     if (!state.project || state.exporting || state.playing) return;
     if (!state.score) state.score = new window.AgenteAudio.Score(currentMood());
     state.score.moodKey = currentMood();
-    state.score.start(player.total(), player.starts(), window.AgenteEngine.SCENE_D);
+    state.score.start(player.total(), player.starts(), player.D);
     player.onEnded = function () { state.playing = false; state.score.stop(); setBusy(false); syncPlayBtn(); };
     if (player.play()) {
       state.playing = true;
@@ -317,7 +331,7 @@
 
     if (!state.score) state.score = new window.AgenteAudio.Score(currentMood());
     state.score.moodKey = currentMood();
-    state.score.start(player.total(), player.starts(), window.AgenteEngine.SCENE_D);
+    state.score.start(player.total(), player.starts(), player.D);
     var audioStream = state.score.stream();
 
     player.onEnded = function (blob) {
@@ -388,7 +402,7 @@
   /* ---------------- SRT ---------------- */
   function downloadSRT() {
     if (!state.scenes.length) return;
-    var srt = window.AgenteEngine.buildSRT(state.scenes);
+    var srt = window.AgenteEngine.buildSRT(state.scenes, player.D, player.X);
     var blob = new Blob([srt], { type: "text/plain" });
     var a = document.createElement("a");
     a.href = URL.createObjectURL(blob);

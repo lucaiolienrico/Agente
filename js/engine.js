@@ -2,18 +2,18 @@
    Agente Video — Motore di rendering + export
    Timeline procedurale: Ken Burns, dissolvenze, grana, letterbox,
    sottotitoli. L'export registra canvas + audio in .webm.
+   La durata scena è parametrica: il totale è sempre esatto
+   (es. 7 scene × 4.97s con dissolvenze = 30.0s).
    ============================================================ */
 (function () {
   "use strict";
 
-  var SCENE_D = 4.0;   // durata di ogni scena (s)
-  var TRANS = 0.8;     // dissolvenza incrociata (s)
+  var SCENE_D = 4.0;   // default durata scena (s)
+  var TRANS = 0.8;     // default dissolvenza incrociata (s)
 
   function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
   function lerp(a, b, t) { return a + (b - a) * t; }
   function ease(t) { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); }
-
-  function sceneStart(i) { return i * (SCENE_D - TRANS); }
 
   function wrapText(ctx, text, maxW) {
     var words = String(text).split(/\s+/);
@@ -46,6 +46,8 @@
     this.ctx = canvas.getContext("2d");
     this.scenes = [];
     this.opt = { subs: true, letterbox: true, grain: true };
+    this.D = SCENE_D;  // durata scena corrente (s)
+    this.X = TRANS;    // dissolvenza corrente (s)
     this.t = 0;
     this.raf = 0;
     this.lastTs = 0;
@@ -62,29 +64,34 @@
 
   Player.prototype.setProject = function (scenes, opt) {
     this.scenes = scenes || [];
-    if (opt) {
-      this.opt.subs = opt.subs !== false;
-      this.opt.letterbox = opt.letterbox !== false;
-      this.opt.grain = opt.grain !== false;
-    }
+    opt = opt || {};
+    this.opt.subs = opt.subs !== false;
+    this.opt.letterbox = opt.letterbox !== false;
+    this.opt.grain = opt.grain !== false;
+    if (opt.sceneDur > 1) this.D = opt.sceneDur;
+    if (opt.trans > 0 && opt.trans < this.D) this.X = opt.trans;
     this.stop();
     this.render(0);
   };
 
+  /* Istante di inizio della scena i-esima */
+  Player.prototype.start = function (i) { return i * (this.D - this.X); };
+
   Player.prototype.total = function () {
     var n = this.scenes.length;
     if (!n) return 0;
-    return n * SCENE_D - (n - 1) * TRANS;
+    return n * this.D - (n - 1) * this.X;
   };
 
   Player.prototype.starts = function () {
-    return this.scenes.map(function (_, i) { return sceneStart(i); });
+    var self = this;
+    return this.scenes.map(function (_, i) { return self.start(i); });
   };
 
   Player.prototype.currentIndex = function (t) {
     var idx = 0;
     for (var i = 0; i < this.scenes.length; i++) {
-      if (t >= sceneStart(i)) idx = i;
+      if (t >= this.start(i)) idx = i;
     }
     return idx;
   };
@@ -194,14 +201,14 @@
     t = clamp(t, 0, this.total());
     // Trova scene visibili (al massimo 2 durante la dissolvenza)
     for (var i = 0; i < n; i++) {
-      var lt = t - sceneStart(i);
-      if (lt < 0 || lt > SCENE_D) continue;
+      var lt = t - this.start(i);
+      if (lt < 0 || lt > this.D) continue;
       var sc = this.scenes[i];
       var alpha = 1;
-      if (i > 0 && lt < TRANS) alpha = ease(lt / TRANS);
+      if (i > 0 && lt < this.X) alpha = ease(lt / this.X);
       ctx.save();
       ctx.globalAlpha = alpha;
-      if (sc.img) this.drawImageCover(sc.img, sc.move || "zoom-in", lt / SCENE_D);
+      if (sc.img) this.drawImageCover(sc.img, sc.move || "zoom-in", lt / this.D);
       ctx.restore();
     }
     var cur = this.scenes[this.currentIndex(t)];
@@ -342,12 +349,15 @@
     return p(h, 2) + ":" + p(m, 2) + ":" + p(s, 2) + "," + p(ms, 3);
   }
 
-  function buildSRT(scenes) {
+  function buildSRT(scenes, sceneDur, trans) {
+    var D = sceneDur > 1 ? sceneDur : SCENE_D;
+    var X = trans > 0 ? trans : TRANS;
+    function st(i) { return i * (D - X); }
     var out = [];
     scenes.forEach(function (sc, i) {
-      var a = sceneStart(i);
+      var a = st(i);
       // Il sottotitolo finisce quando inizia la scena successiva (niente sovrapposizioni)
-      var b = (i < scenes.length - 1) ? sceneStart(i + 1) + 0.3 : a + SCENE_D;
+      var b = (i < scenes.length - 1) ? st(i + 1) + 0.3 : a + D;
       out.push((i + 1) + "\n" + srtTime(a) + " --> " + srtTime(b) + "\n" + (sc.line || "") + "\n");
     });
     return out.join("\n");

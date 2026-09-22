@@ -16,7 +16,7 @@ Ispirato a **Google Veo 3 / Flow**.
 - 🔊 Anteprima **voce fuori campo** (sintesi vocale del browser)
 - ⏺️ **Export in `.webm`** (canvas + audio registrati in tempo reale) + download
 - 🧠 **Integrazione Gemini opzionale**: con chiave gratuita, sceneggiatura e prompt-enhancer diventano AI
-- 📱 Formati **16:9, 9:16, 1:1** · durate **8/12/16 s** · 8 stili visivi
+- 📱 Formati **16:9, 9:16, 1:1** · durate **8/12/16/30 s** · 8 stili visivi
 - 🕘 Cronologia locale delle creazioni (con anteprime)
 
 ## 🚀 Avvio
