@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Agente Video — Generatore di video AI stile Veo 3</title>
+<meta name="description" content="Agente Video: descrivi una scena a parole e ottieni un vero video cinematografico. Stile Google Veo 3, gratis, senza code, direttamente nel browser." />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23a78bfa'/%3E%3Cstop offset='1' stop-color='%2322d3ee'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='32' height='32' rx='8' fill='url(%23g)'/%3E%3Cpath d='M13 10.5v11l9-5.5z' fill='white'/%3E%3C/svg%3E" />
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <a class="brand" href="#top">
+      <span class="brand-logo" aria-hidden="true">
+        <svg viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="url(#lg)"/><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a78bfa"/><stop offset="1" stop-color="#22d3ee"/></linearGradient></defs><path d="M13 10.5v11l9-5.5z" fill="#fff"/></svg>
+      </span>
+      <span class="brand-name">Agente <em>Video</em></span>
+    </a>
+    <nav class="nav">
+      <a href="#studio">Studio</a>
+      <a href="#esempi">Esempi</a>
+      <a href="#come-funziona">Come funziona</a>
+    </nav>
+    <button class="btn btn-ghost btn-sm" id="btnKey" title="Usa la tua chiave Gemini per sceneggiature più intelligenti">🔑 API Key</button>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- HERO + PROMPT -->
+  <section class="hero wrap">
+    <div class="badge">✨ Generatore di video AI · ispirato a Google Veo 3</div>
+    <h1>Descrivi il video.<br /><span class="grad">Ci pensa Agente.</span></h1>
+    <p class="sub">Scrivi un prompt in italiano, scegli stile e formato — l'app crea sceneggiatura, immagini cinematografiche, movimenti di camera, sottotitoli e colonna sonora, poi <strong>esporta un vero file video</strong> pronto da scaricare.</p>
+
+    <div class="prompt-card" id="promptCard">
+      <label class="fld-label" for="prompt">Il tuo prompt</label>
+      <textarea id="prompt" rows="3" placeholder="Es. Un drone sorvola le coste frastagliate della Sardegna al tramonto, poi si tuffa tra le onde…"></textarea>
+      <div class="prompt-row">
+        <button class="btn btn-ghost btn-sm" id="btnEnhance" title="Arricchisci il prompt con dettagli cinematografici">✨ Migliora prompt</button>
+        <button class="btn btn-ghost btn-sm" id="btnSurprise" title="Prova un prompt a sorpresa">🎲 A sorpresa</button>
+        <span class="hint" id="aiBadge">🧠 Sceneggiatura: locale (funziona senza chiave)</span>
+      </div>
+
+      <div class="settings">
+        <div class="fld">
+          <label for="selStyle">Stile visivo</label>
+          <select id="selStyle">
+            <option value="cinematic" selected>🎬 Cinematografico</option>
+            <option value="photoreal">📷 Fotorealistico</option>
+            <option value="nature">🌿 Natura epica</option>
+            <option value="scifi">🚀 Fantascienza</option>
+            <option value="cyberpunk">🌃 Cyberpunk</option>
+            <option value="anime">🎌 Anime</option>
+            <option value="watercolor">🎨 Acquerello</option>
+            <option value="noir">🕶️ Noir B/N</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label>Formato</label>
+          <div class="seg" id="segRatio">
+            <button data-v="16:9" class="on">16:9</button>
+            <button data-v="9:16">9:16</button>
+            <button data-v="1:1">1:1</button>
+          </div>
+        </div>
+        <div class="fld">
+          <label>Durata</label>
+          <div class="seg" id="segDur">
+            <button data-v="8">8s</button>
+            <button data-v="12" class="on">12s</button>
+            <button data-v="16">16s</button>
+          </div>
+        </div>
+        <div class="fld">
+          <label for="selCam">Movimento camera</label>
+          <select id="selCam">
+            <option value="auto" selected>🎥 Automatico (mix)</option>
+            <option value="zoom-in">🔍 Zoom avanti</option>
+            <option value="zoom-out">🔭 Zoom indietro</option>
+            <option value="pan-left">⬅️ Panoramica ←</option>
+            <option value="pan-right">➡️ Panoramica →</option>
+            <option value="pan-up">⬆️ Verso l'alto</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label for="selMusic">Colonna sonora</label>
+          <select id="selMusic">
+            <option value="epic" selected>⚔️ Epica</option>
+            <option value="chill">🌊 Rilassante</option>
+            <option value="tense">😱 Tensione</option>
+            <option value="happy">☀️ Allegra</option>
+            <option value="none">🔇 Nessuna</option>
+          </select>
+        </div>
+        <div class="fld toggles">
+          <label class="tgl"><input type="checkbox" id="chkSubs" checked /> <span>Sottotitoli</span></label>
+          <label class="tgl"><input type="checkbox" id="chkBox" checked /> <span>Letterbox cinema</span></label>
+          <label class="tgl"><input type="checkbox" id="chkGrain" checked /> <span>Grana film</span></label>
+        </div>
+      </div>
+
+      <button class="btn btn-primary btn-xl" id="btnGenerate">🎬 Genera video</button>
+      <p class="fine">Nessuna coda, nessun costo, nessun account. Le immagini AI sono generate nel tuo browser via provider gratuiti.</p>
+    </div>
+
+    <ol class="steps" id="steps">
+      <li data-s="script"><span>1</span>Sceneggiatura</li>
+      <li data-s="images"><span>2</span>Immagini AI</li>
+      <li data-s="edit"><span>3</span>Montaggio</li>
+      <li data-s="ready"><span>4</span>Pronto</li>
+    </ol>
+    <div class="progress"><div class="progress-bar" id="genProgress"></div></div>
+    <p class="status" id="genStatus">In attesa… scrivi un prompt e premi “Genera video”.</p>
+  </section>
+
+  <!-- STUDIO -->
+  <section class="wrap studio" id="studio">
+    <div class="panel storyboard">
+      <div class="panel-head">
+        <h2>🎞️ Storyboard</h2>
+        <button class="btn btn-ghost btn-sm" id="btnVoice" disabled title="Ascolta la voce fuori campo (anteprima)">🔊 Voce</button>
+      </div>
+      <div class="scenes" id="scenes">
+        <div class="empty">Le scene appariranno qui dopo la generazione.<br />Ogni scena ha immagine, inquadratura e narrazione.</div>
+      </div>
+    </div>
+
+    <div class="panel player">
+      <div class="panel-head">
+        <h2>📺 Anteprima</h2>
+        <span class="pill" id="metaPill">—</span>
+      </div>
+      <div class="canvas-wrap" id="canvasWrap">
+        <canvas id="stage" width="1280" height="720"></canvas>
+        <div class="canvas-overlay" id="canvasOverlay">
+          <div class="overlay-play">▶</div>
+          <p>Premi “Genera video”, poi Play</p>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="btn btn-ghost" id="btnPlay" disabled>▶ Play</button>
+        <button class="btn btn-ghost" id="btnStop" disabled>⏹ Stop</button>
+        <span class="time" id="timeLabel">0.0s / 0.0s</span>
+        <div class="dots" id="sceneDots"></div>
+      </div>
+      <div class="export">
+        <button class="btn btn-primary" id="btnExport" disabled>⏺️ Esporta video (.webm)</button>
+        <div class="progress slim"><div class="progress-bar" id="expProgress"></div></div>
+      </div>
+      <div class="result hidden" id="resultBox">
+        <h3>✅ Video pronto!</h3>
+        <video id="resultVideo" controls playsinline></video>
+        <div class="result-actions">
+          <a class="btn btn-primary btn-sm" id="btnDownload" download="agente-video.webm">⬇️ Scarica video</a>
+          <button class="btn btn-ghost btn-sm" id="btnSrt">⬇️ Sottotitoli (.srt)</button>
+          <button class="btn btn-ghost btn-sm" id="btnNew">🔄 Nuovo video</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ESEMPI -->
+  <section class="wrap section" id="esempi">
+    <h2>💡 Esempi da provare</h2>
+    <p class="sub-sm">Clicca per caricare il prompt nello studio.</p>
+    <div class="cards" id="exampleCards"></div>
+  </section>
+
+  <!-- CRONOLOGIA -->
+  <section class="wrap section" id="cronologia" hidden>
+    <h2>🕘 Le tue creazioni recenti</h2>
+    <div class="cards" id="historyCards"></div>
+  </section>
+
+  <!-- COME FUNZIONA -->
+  <section class="wrap section" id="come-funziona">
+    <h2>⚙️ Come funziona</h2>
+    <div class="how-grid">
+      <div class="how"><div class="how-n">1</div><h3>Sceneggiatura</h3><p>Il prompt viene trasformato in scene con inquadratura, movimento di camera e battuta narrativa. Con chiave Gemini è l'AI a scriverla, altrimenti un motore locale.</p></div>
+      <div class="how"><div class="how-n">2</div><h3>Immagini AI</h3><p>Ogni scena diventa un'immagine cinematografica generata via provider gratuiti (Pollinations/FLUX), con fallback automatici se un servizio non risponde.</p></div>
+      <div class="how"><div class="how-n">3</div><h3>Montaggio live</h3><p>Un motore canvas applica zoom/panoramiche (effetto Ken Burns), dissolvenze, grana film, letterbox e sottotitoli — come una vera timeline di editing.</p></div>
+      <div class="how"><div class="how-n">4</div><h3>Musica + export</h3><p>La colonna sonora è sintetizzata in tempo reale con Web Audio. L'export registra canvas + audio in un file <strong>.webm</strong> scaricabile e condivisibile.</p></div>
+    </div>
+    <div class="note">
+      <strong>🔒 Privacy:</strong> tutto gira nel tuo browser. L'eventuale chiave Gemini resta nel <em>localStorage</em> del tuo dispositivo e non transita da nostri server (non ce ne sono proprio).<br />
+      <strong>🎯 Differenze da Veo 3:</strong> Veo genera ogni pixel in movimento con un modello di diffusione video. Agente Video anima immagini AI con regia procedurale: è istantaneo e gratuito, ma non crea vero moto fisico (persone che camminano, acqua che scorre).
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap foot">
+    <span>Agente Video · generatore video AI nel browser · fatto con 🎬</span>
+    <span class="foot-links"><a href="#top">↑ Torna su</a></span>
+  </div>
+</footer>
+
+<!-- MODAL API KEY -->
+<div class="modal-bg hidden" id="keyModal">
+  <div class="modal">
+    <h3>🔑 Chiave API di Google Gemini (facoltativa)</h3>
+    <p>Con una chiave gratuita la <strong>sceneggiatura</strong> viene scritta da Gemini 2.0 Flash (scene più varie e pertinenti) e il <strong>miglioramento prompt</strong> diventa intelligente. Senza chiave, tutto funziona lo stesso in modalità locale.</p>
+    <ol class="key-steps">
+      <li>Vai su <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> e crea una chiave gratuita</li>
+      <li>Incollala qui sotto e salva</li>
+    </ol>
+    <input type="password" id="keyInput" placeholder="AIza…" autocomplete="off" />
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" id="btnKeyRemove">Rimuovi</button>
+      <button class="btn btn-ghost btn-sm" id="btnKeyClose">Chiudi</button>
+      <button class="btn btn-primary btn-sm" id="btnKeySave">Salva chiave</button>
+    </div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+
+<script src="js/script.js"></script>
+<script src="js/providers.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
